@@ -2,9 +2,9 @@
   "name": "ipcamsd",
   "version": "0.1.0",
   "description": "Command line tool and library for downloading, merging and converting .264 files",
-  "main": "src/lib.js",
+  "main": "./src/lib.js",
   "bin": {
-    "ipcamsd": "src/cli.js"
+    "ipcamsd": "./src/cli.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
