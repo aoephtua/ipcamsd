@@ -1,0 +1,40 @@
+{
+  "name": "ipcamsd",
+  "version": "0.1.0",
+  "description": "Command line tool and library for downloading, merging and converting .264 files",
+  "main": "src/lib.js",
+  "bin": {
+    "ipcamsd": "src/cli.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": {
+    "name": "Thorsten A. Weintz"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:aoephtua/ipcamsd.git"
+  },
+  "keywords": [
+    "bedee",
+    "h264",
+    "h.264",
+    "ip-camera",
+    "camera",
+    "conversion"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^2.4.2",
+    "cheerio": "^1.0.0-rc.3",
+    "chipcaco": "^0.1.1",
+    "command-exists": "^1.2.8",
+    "commander": "^2.20.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "fs-extra": "^8.1.0",
+    "moment": "^2.24.0",
+    "request": "^2.88.0",
+    "tmp": "^0.1.0"
+  }
+}
