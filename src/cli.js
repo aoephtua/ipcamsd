@@ -13,11 +13,11 @@ function collect(value, previous) {
 }
 
 program
-    .version('0.1.1', '-v, --version')
+    .version('0.1.2', '-v, --version')
     .option('-d, --date <yyyymmdd|today|yesterday>', 'date of records')
     .option('-t, --target-directory <dir>', 'target directory for converted files')
     .option('-f, --video-filter <filter>', 'video filter in ffmpeg required format', collect, [])
-    .option('-h', 'host of ip camera')
+    .option('-h, --host <host>', 'host of ip camera')
     .option('-u, --username <username>', 'username for basic authentication')
     .option('-p, --password <password>', 'password for basic authentication')
     .option('--ssl', 'use secure socket layer', false);
