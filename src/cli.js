@@ -13,7 +13,7 @@ function collect(value, previous) {
 }
 
 program
-    .version('0.1.2', '-v, --version')
+    .version('0.1.3', '-v, --version')
     .option('-d, --date <yyyymmdd|today|yesterday>', 'date of records')
     .option('-t, --target-directory <dir>', 'target directory for converted files')
     .option('-f, --video-filter <filter>', 'video filter in ffmpeg required format', collect, [])

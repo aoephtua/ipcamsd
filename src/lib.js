@@ -179,7 +179,7 @@ async function concatenateAndConvertToTargetFile(dateObj, tmpDir) {
             
         addVideoFilter(ffmpegCmd);
             
-        ffmpegCmd.save(path.join(ipcamsd.settings.directory || __dirname, dateObj.date + TARGET_FILE_TYPE));
+        ffmpegCmd.save(path.join(ipcamsd.settings.directory || process.cwd(), dateObj.date + TARGET_FILE_TYPE));
     });
 }
 
