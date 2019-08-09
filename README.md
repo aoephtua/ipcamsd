@@ -20,6 +20,8 @@ Node.js command line tool and library for downloading, merging and converting .2
 Options:
   -v, --version                          output the version number
   -d, --date <yyyymmdd|today|yesterday>  date of records
+  -s, --time-start <hhmmss>              start time of records (name filter)
+  -e, --time-end <hhmmss>                end time of records (name filter)
   -t, --target-directory <dir>           target directory for converted files
   -f, --video-filter <filter>            video filter in ffmpeg required format (default: [])
   -h, --host <host>                      host of ip camera

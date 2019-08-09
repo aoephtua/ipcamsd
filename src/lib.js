@@ -67,20 +67,47 @@ function getTableRowItems(body) {
 }
 
 /**
+ * Validates time filter of record entries
+ * @param {*} record File name of record entry
+ * @param {*} filter Time filter for record entry
+ * @param {*} start Apply >= or <= operator
+ */
+function validateRecordFilter(record, filter, start) {
+    if (!filter) {
+        return true;
+    }
+
+    let recFrom = record.substring(8, 14);
+    let recTo = record.substring(15, 21);
+
+    return start ? recFrom >= filter || recTo >= filter :
+        recFrom <= filter || recTo <= filter;
+}
+
+/**
  * Requests HTML body of records by date
  * @param {*} date String value with date of records
+ * @param {*} timeFilter Object with time filter
  */
-async function get264Entries(date) {
+async function get264Entries(date, timeFilter) {
     return new Promise(resolve => {
         httpContentRequest(getRecordsDirectoryUrlByDate(date)).then(content => {
-            resolve(getTableRowItems(content));
+            let entries = [];
+            getTableRowItems(content).forEach(entry => {
+                if (entry.indexOf('999999') === -1
+                    && validateRecordFilter(entry, timeFilter.start, true)
+                    && validateRecordFilter(entry, timeFilter.end)) {
+                    entries.push(entry);
+                }
+            });
+            resolve(entries);
         });
     });
 }
 
 /**
  * Request date entries by parameters
- * @param {*} date 
+ * @param {*} date String value with date of records
  */
 async function getDateEntries(date) {
     return new Promise((resolve, reject) => {
@@ -89,7 +116,7 @@ async function getDateEntries(date) {
         } else {
             httpContentRequest(ipcamsd.settings.baseUrl).then(content => {
                 let dates = getTableRowItems(content).map(value => {
-                    return value.splice(0, -1);
+                    return value.slice(0, -1);
                 });
                 resolve(dates);
             }, (err) => reject(err));
@@ -99,24 +126,27 @@ async function getDateEntries(date) {
 
 /**
  * Requests all records of specified host
- * @param {*} date
  */
-async function getRecords(date) {
+async function getRecords() {
     return new Promise((resolve, reject) => {
-        getDateEntries(date).then(entries => {
+        let dateTimeFilter = ipcamsd.settings.dateTimeFilter;
+        let date = getDateByParameters(dateTimeFilter.date);
+
+        getDateEntries(date).then(async entries => {
             let dates = [];
 
-            entries.forEach(async (value, _idx, array) => {
-                await get264Entries(value).then(records => {
+            for (let i = 0; i < entries.length; i++) {
+                let value = entries[i];
+                await get264Entries(value, dateTimeFilter.time).then(records => {
                     dates.push({
                         date: value,
                         records: records
                     });
-                    if (array.length == dates.length) {
+                    if (entries.length == dates.length) {
                         resolve(dates);
                     }
                 });
-            });
+            }
         }, (err) => reject(err));
     });
 }
@@ -179,7 +209,7 @@ async function concatenateAndConvertToTargetFile(dateObj, tmpDir) {
             
         addVideoFilter(ffmpegCmd);
             
-        ffmpegCmd.save(path.join(ipcamsd.settings.directory || process.cwd(), dateObj.date + TARGET_FILE_TYPE));
+        ffmpegCmd.save(path.join(ipcamsd.settings.directory || process.cwd(), getFilenameByTimeFilter(dateObj.date)));
     });
 }
 
@@ -194,16 +224,14 @@ async function downloadAndConvertRecordFiles(dateObj, dateTmpDir) {
     for (let j = 0; j < dateObj.records.length; j++) {
         let record = dateObj.records[j];
 
-        if (record.indexOf('999999') === -1) {
-            let fileUrl = dateDirectoryUrl + '/' + record;
-            let localFile = dateTmpDir + '\\' + record;
-            await httpContentToFileStream(fileUrl, localFile);
+        let fileUrl = dateDirectoryUrl + '/' + record;
+        let localFile = dateTmpDir + '\\' + record;
+        await httpContentToFileStream(fileUrl, localFile);
 
-            log(chalk.magenta('Converting with chipcaco'));
-            let localConvFile = localFile + '_';
-            await chipcaco.file(localFile, localConvFile);
-            fs.moveSync(localConvFile, localFile, { overwrite: true });
-        }
+        log(chalk.magenta('Converting with chipcaco'));
+        let localConvFile = localFile + '_';
+        await chipcaco.file(localFile, localConvFile);
+        fs.moveSync(localConvFile, localFile, { overwrite: true });
     }
 }
 
@@ -217,16 +245,18 @@ async function transferConvertMerge264Files(dates, tmpDir) {
         for (let i = 0; i < dates.length; i++) {
             let dateObj = dates[i];
 
-            log(chalk.blue(dateObj.date));
+            if (dateObj.records.length > 0) {
+                log(chalk.blue(dateObj.date));
 
-            let dateTmpDir = tmpDir.name + '\\' + dateObj.date;
-            fs.mkdirSync(dateTmpDir);
-
-            log(chalk.magenta('Download and convert record files'));
-            await downloadAndConvertRecordFiles(dateObj, dateTmpDir);
-
-            log(chalk.magenta('Merging with ffmpeg'));
-            await concatenateAndConvertToTargetFile(dateObj, dateTmpDir);
+                let dateTmpDir = tmpDir.name + '\\' + dateObj.date;
+                fs.mkdirSync(dateTmpDir);
+    
+                log(chalk.magenta('Download and convert record files'));
+                await downloadAndConvertRecordFiles(dateObj, dateTmpDir);
+    
+                log(chalk.magenta('Merging with ffmpeg'));
+                await concatenateAndConvertToTargetFile(dateObj, dateTmpDir);   
+            }
         }
         resolve();
     });
@@ -299,12 +329,51 @@ function getDateByParameters(date) {
 }
 
 /**
+ * Processes date time filter of record entries
+ * @param {*} filter Time filter for record entry
+ */
+function processRecordFilter(filter) {
+    if (filter) {
+        filter = filter.trim();
+
+        if (filter.length > 0) {
+            if (filter.length < 6) {
+                if (filter.length === 1) {
+                    filter = '0' + filter;
+                }
+                filter += '0'.repeat(6 - filter.length);
+            }
+
+            return filter;
+        }
+    }
+}
+
+/**
+ * Gets target file name by date time filter
+ * @param {*} date Target date value
+ */
+function getFilenameByTimeFilter(date) {
+    let timeFilter = ipcamsd.settings.dateTimeFilter.time;
+
+    if (timeFilter.start) {
+        date += `_${timeFilter.start}`;
+        if (timeFilter.end) {
+            date += `_${timeFilter.end}`;
+        }
+    }
+
+    return date + TARGET_FILE_TYPE;
+}
+
+/**
  * Transfers, converts and merges .246 files to target directory
  */
-ipcamsd.process = async (date, directory, videoFilter, host, username, password, ssl) => new Promise((resolve, reject) => {
+ipcamsd.process = async (dateTimeFilter, directory, videoFilter, host, username, password, ssl) => new Promise((resolve, reject) => {
     commandExists('ffmpeg')
         .then(() => {
             ipcamsd.settings = {
+                dateTimeFilter: dateTimeFilter,
                 directory: directory,
                 videoFilter: videoFilter,
                 baseUrl: 'http' + (ssl ? 's' :'' ) + `://${host}/sd`,
@@ -312,10 +381,14 @@ ipcamsd.process = async (date, directory, videoFilter, host, username, password,
                 password: password,
                 headers: getHeadersForBasicAuthentication(username, password)
             };
+
+            let timeFilterObj = ipcamsd.settings.dateTimeFilter.time;
+            timeFilterObj.start = processRecordFilter(timeFilterObj.start);
+            timeFilterObj.end = processRecordFilter(timeFilterObj.end);
         
             let tmpDir = tmp.dirSync({ prefix: 'ipcamsd' });
         
-            getRecords(getDateByParameters(date)).then(dates => {
+            getRecords().then(dates => {
                 transferConvertMerge264Files(dates, tmpDir).then(() => {
                     fs.removeSync(tmpDir.name);
                     resolve();
