@@ -28,6 +28,16 @@ const DATE_FORMAT = 'YYYYMMDD';
 const TARGET_FILE_TYPE = '.mp4';
 
 /**
+ * Extracts time value from file name of record
+ * @param {*} start Start or end time
+ */
+String.prototype.extractTimeValue = function(start) {
+    let value = this.valueOf();
+
+    return start ? value.substr(8, 14) : value.substr(15, 21);
+};
+
+/**
  * Gets object with authorization header for basic authentication of HTTP request
  * @param {*} username Username for basic authentication
  * @param {*} password Password for authentication
@@ -77,8 +87,8 @@ function validateRecordFilter(record, filter, start) {
         return true;
     }
 
-    let recFrom = record.substring(8, 14);
-    let recTo = record.substring(15, 21);
+    let recFrom = record.extractTimeValue(true);
+    let recTo = record.extractTimeValue();
 
     return start ? recFrom >= filter || recTo >= filter :
         recFrom <= filter || recTo <= filter;
@@ -209,7 +219,7 @@ async function concatenateAndConvertToTargetFile(dateObj, tmpDir) {
             
         addVideoFilter(ffmpegCmd);
             
-        ffmpegCmd.save(path.join(ipcamsd.settings.directory || process.cwd(), getFilenameByTimeFilter(dateObj.date)));
+        ffmpegCmd.save(path.join(ipcamsd.settings.directory || process.cwd(), getFilenameByTimeFilter(dateObj)));
     });
 }
 
@@ -351,15 +361,19 @@ function processRecordFilter(filter) {
 
 /**
  * Gets target file name by date time filter
- * @param {*} date Target date value
+ * @param {*} dateObj Object with date and Array of records
  */
-function getFilenameByTimeFilter(date) {
+function getFilenameByTimeFilter(dateObj) {
+    let date = dateObj.date;
     let timeFilter = ipcamsd.settings.dateTimeFilter.time;
 
     if (timeFilter.start) {
         date += `_${timeFilter.start}`;
         if (timeFilter.end) {
             date += `_${timeFilter.end}`;
+        } else {
+            let records = dateObj.records;
+            date += `_${records[records.length-1].extractTimeValue()}`;
         }
     }
 
@@ -368,6 +382,13 @@ function getFilenameByTimeFilter(date) {
 
 /**
  * Transfers, converts and merges .246 files to target directory
+ * @param {*} dateTimeFilter Object with date and time filter
+ * @param {*} directory Target directory for output files
+ * @param {*} videoFilter Video filter in ffmpeg required format
+ * @param {*} host Host of IP camera
+ * @param {*} username Username for basic authentication
+ * @param {*} password Password for basic authentication
+ * @param {*} ssl Use secure socket layer as transport protocol
  */
 ipcamsd.process = async (dateTimeFilter, directory, videoFilter, host, username, password, ssl) => new Promise((resolve, reject) => {
     commandExists('ffmpeg')

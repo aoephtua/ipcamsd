@@ -13,7 +13,7 @@ function collect(value, previous) {
 }
 
 program
-    .version('0.1.4', '-v, --version')
+    .version('0.1.5', '-v, --version')
     .option('-d, --date <yyyymmdd|today|yesterday>', 'date of records')
     .option('-s, --time-start <hhmmss>', 'start time of records (name filter)')
     .option('-e, --time-end <hhmmss>', 'end time of records (name filter)')
