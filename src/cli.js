@@ -13,11 +13,12 @@ function collect(value, previous) {
 }
 
 program
-    .version('0.1.5', '-v, --version')
+    .version('0.1.6', '-v, --version')
     .option('-d, --date <yyyymmdd|today|yesterday>', 'date of records')
     .option('-s, --time-start <hhmmss>', 'start time of records (name filter)')
     .option('-e, --time-end <hhmmss>', 'end time of records (name filter)')
     .option('-t, --target-directory <dir>', 'target directory for converted files')
+    .option('-y, --target-file-type <type>', 'target file type used by ffmpeg for conversion')
     .option('-f, --video-filter <filter>', 'video filter in ffmpeg required format', collect, [])
     .option('-h, --host <host>', 'host of ip camera')
     .option('-u, --username <username>', 'username for basic authentication')
@@ -40,5 +41,10 @@ let dateTimeFilter = {
     }  
 };
 
-ipcamsd.process(dateTimeFilter, program.targetDirectory, program.videoFilter, program.host, program.username, program.password, program.ssl)
+let ffmpegParams = {
+    videoFilter: program.videoFilter,
+    targetFileType: program.targetFileType
+};
+
+ipcamsd.process(dateTimeFilter, program.targetDirectory, ffmpegParams, program.host, program.username, program.password, program.ssl)
     .then(null, (err) => console.error(err));

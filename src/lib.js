@@ -23,9 +23,9 @@ const log = console.log;
 const DATE_FORMAT = 'YYYYMMDD';
 
 /**
- * Target file type used by ffmpeg for conversion
+ * Default target file type used by ffmpeg for conversion
  */
-const TARGET_FILE_TYPE = '.mp4';
+const DEFAULT_TARGET_FILE_TYPE = 'mp4';
 
 /**
  * Extracts time value from file name of record
@@ -184,7 +184,7 @@ function createFileList(dateObj, dir) {
  * @param {*} ffmpegCmd Instance of fluent-ffmpeg
  */
 function addVideoFilter(ffmpegCmd) {
-    let videoFilter = ipcamsd.settings.videoFilter;
+    let videoFilter = ipcamsd.settings.ffmpegParams.videoFilter;
 
     if (videoFilter.length > 0) {
         videoFilter.forEach(filter => {
@@ -360,6 +360,19 @@ function processRecordFilter(filter) {
 }
 
 /**
+ * Gets file type by ffmpeg parameters or default value
+ */
+function getFileTypeByFfmpegParams() {
+    let ffmpegParams = ipcamsd.settings.ffmpegParams;
+
+    if (ffmpegParams.targetFileType) {
+        return ffmpegParams.targetFileType.toLowerCase();
+    }
+    
+    return DEFAULT_TARGET_FILE_TYPE;
+}
+
+/**
  * Gets target file name by date time filter
  * @param {*} dateObj Object with date and Array of records
  */
@@ -377,26 +390,26 @@ function getFilenameByTimeFilter(dateObj) {
         }
     }
 
-    return date + TARGET_FILE_TYPE;
+    return date + '.' + getFileTypeByFfmpegParams();
 }
 
 /**
  * Transfers, converts and merges .246 files to target directory
  * @param {*} dateTimeFilter Object with date and time filter
  * @param {*} directory Target directory for output files
- * @param {*} videoFilter Video filter in ffmpeg required format
+ * @param {*} ffmpegParams Parameters in ffmpeg required format
  * @param {*} host Host of IP camera
  * @param {*} username Username for basic authentication
  * @param {*} password Password for basic authentication
  * @param {*} ssl Use secure socket layer as transport protocol
  */
-ipcamsd.process = async (dateTimeFilter, directory, videoFilter, host, username, password, ssl) => new Promise((resolve, reject) => {
+ipcamsd.process = async (dateTimeFilter, directory, ffmpegParams, host, username, password, ssl) => new Promise((resolve, reject) => {
     commandExists('ffmpeg')
         .then(() => {
             ipcamsd.settings = {
                 dateTimeFilter: dateTimeFilter,
                 directory: directory,
-                videoFilter: videoFilter,
+                ffmpegParams: ffmpegParams,
                 baseUrl: 'http' + (ssl ? 's' :'' ) + `://${host}/sd`,
                 username: username, 
                 password: password,

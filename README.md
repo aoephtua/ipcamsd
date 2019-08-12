@@ -23,6 +23,7 @@ Options:
   -s, --time-start <hhmmss>              start time of records (name filter)
   -e, --time-end <hhmmss>                end time of records (name filter)
   -t, --target-directory <dir>           target directory for converted files
+  -y, --target-file-type <type>          target file type used by ffmpeg for conversion (default: mp4)
   -f, --video-filter <filter>            video filter in ffmpeg required format (default: [])
   -h, --host <host>                      host of ip camera
   -u, --username <username>              username for basic authentication
