@@ -33,8 +33,9 @@ const DEFAULT_TARGET_FILE_TYPE = 'mp4';
  */
 String.prototype.extractTimeValue = function(start) {
     let value = this.valueOf();
+    const length = 6;
 
-    return start ? value.substr(8, 14) : value.substr(15, 21);
+    return start ? value.substr(8, length) : value.substr(15, length);
 };
 
 /**
