@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Copyright (c) 2019, Thorsten A. Weintz. All rights reserved.
+// Copyright (c) 2020, Thorsten A. Weintz. All rights reserved.
 // Licensed under the MIT license. See LICENSE in the project root for license information.
 
 'use strict';
@@ -13,10 +13,12 @@ function collect(value, previous) {
 }
 
 program
-    .version('0.1.6', '-v, --version')
+    .version('0.1.7', '-v, --version')
     .option('-d, --date <yyyymmdd|today|yesterday>', 'date of records')
     .option('-s, --time-start <hhmmss>', 'start time of records (name filter)')
     .option('-e, --time-end <hhmmss>', 'end time of records (name filter)')
+    .option('-l, --last-minutes <number>', 'last minutes of records till now (start time skipped)', parseInt)
+    .option('-i, --start-delay <number>', 'start delay in minutes', parseInt)
     .option('-t, --target-directory <dir>', 'target directory for converted files')
     .option('-y, --target-file-type <type>', 'target file type used by ffmpeg for conversion')
     .option('-f, --video-filter <filter>', 'video filter in ffmpeg required format', collect, [])
@@ -38,7 +40,9 @@ let dateTimeFilter = {
     time: {
         start: program.timeStart,
         end: program.timeEnd
-    }  
+    },
+    lastMinutes: program.lastMinutes,
+    startDelay: program.startDelay
 };
 
 let ffmpegParams = {

@@ -1,4 +1,4 @@
-// Copyright (c) 2019, Thorsten A. Weintz. All rights reserved.
+// Copyright (c) 2020, Thorsten A. Weintz. All rights reserved.
 // Licensed under the MIT license. See LICENSE in the project root for license information.
 
 'use strict';
@@ -21,6 +21,11 @@ const log = console.log;
  * Date format used by IP cameras
  */
 const DATE_FORMAT = 'YYYYMMDD';
+
+/**
+ * Time format used by IP Cameras
+ */
+const TIME_FORMAT = 'HHmmss';
 
 /**
  * Default target file type used by ffmpeg for conversion
@@ -395,6 +400,27 @@ function getFilenameByTimeFilter(dateObj) {
 }
 
 /**
+ * Validates date and time filter object
+ * @param {*} dateTimeFilter Object with date and time filter
+ */
+function validateDateTimeFilter(dateTimeFilter) {
+    if (dateTimeFilter.lastMinutes) {
+        let startDate = moment().subtract(dateTimeFilter.lastMinutes, 'minutes');
+        dateTimeFilter.date = startDate.format(DATE_FORMAT);
+        dateTimeFilter.time.start = startDate.format(TIME_FORMAT);
+    }
+    return dateTimeFilter;
+}
+
+/**
+ * Calculates start delay in milliseconds
+ * @param {*} dateTimeFilter Object with date and time filter
+ */
+function calculateStartDelayInMs(dateTimeFilter) {
+    return dateTimeFilter.startDelay ? dateTimeFilter.startDelay * 60000 : 0;
+}
+
+/**
  * Transfers, converts and merges .246 files to target directory
  * @param {*} dateTimeFilter Object with date and time filter
  * @param {*} directory Target directory for output files
@@ -407,28 +433,31 @@ function getFilenameByTimeFilter(dateObj) {
 ipcamsd.process = async (dateTimeFilter, directory, ffmpegParams, host, username, password, ssl) => new Promise((resolve, reject) => {
     commandExists('ffmpeg')
         .then(() => {
-            ipcamsd.settings = {
-                dateTimeFilter: dateTimeFilter,
-                directory: directory,
-                ffmpegParams: ffmpegParams,
-                baseUrl: 'http' + (ssl ? 's' :'' ) + `://${host}/sd`,
-                username: username, 
-                password: password,
-                headers: getHeadersForBasicAuthentication(username, password)
-            };
-
-            let timeFilterObj = ipcamsd.settings.dateTimeFilter.time;
-            timeFilterObj.start = processRecordFilter(timeFilterObj.start);
-            timeFilterObj.end = processRecordFilter(timeFilterObj.end);
-        
-            let tmpDir = tmp.dirSync({ prefix: 'ipcamsd' });
-        
-            getRecords().then(dates => {
-                transferConvertMerge264Files(dates, tmpDir).then(() => {
-                    fs.removeSync(tmpDir.name);
-                    resolve();
-                }, (err) => reject(err));
-            });
+            let startDelay = calculateStartDelayInMs(dateTimeFilter);
+            setTimeout(() => {
+                ipcamsd.settings = {
+                    dateTimeFilter: validateDateTimeFilter(dateTimeFilter),
+                    directory: directory,
+                    ffmpegParams: ffmpegParams,
+                    baseUrl: 'http' + (ssl ? 's' :'' ) + `://${host}/sd`,
+                    username: username, 
+                    password: password,
+                    headers: getHeadersForBasicAuthentication(username, password)
+                };
+    
+                let timeFilterObj = ipcamsd.settings.dateTimeFilter.time;
+                timeFilterObj.start = processRecordFilter(timeFilterObj.start);
+                timeFilterObj.end = processRecordFilter(timeFilterObj.end);
+            
+                let tmpDir = tmp.dirSync({ prefix: 'ipcamsd' });
+            
+                getRecords().then(dates => {
+                    transferConvertMerge264Files(dates, tmpDir).then(() => {
+                        fs.removeSync(tmpDir.name);
+                        resolve();
+                    }, (err) => reject(err));
+                });
+            }, startDelay);
         })
         .catch(() => {
             reject('ffmpeg not installed');

@@ -22,6 +22,8 @@ Options:
   -d, --date <yyyymmdd|today|yesterday>  date of records
   -s, --time-start <hhmmss>              start time of records (name filter)
   -e, --time-end <hhmmss>                end time of records (name filter)
+  -l, --last-minutes <mm>                last minutes of records till now (start time skipped)
+  -i, --start-delay <number>             start delay in minutes
   -t, --target-directory <dir>           target directory for converted files
   -y, --target-file-type <type>          target file type used by ffmpeg for conversion (default: mp4)
   -f, --video-filter <filter>            video filter in ffmpeg required format (default: [])
