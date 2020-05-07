@@ -1,6 +1,6 @@
 {
   "name": "ipcamsd",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Command line tool and library for downloading, merging and converting .264 files",
   "main": "./src/lib.js",
   "bin": {
@@ -26,15 +26,15 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "chalk": "^3.0.0",
+    "chalk": "^4.0.0",
     "cheerio": "^1.0.0-rc.3",
     "chipcaco": "^0.1.1",
-    "command-exists": "^1.2.8",
-    "commander": "^4.1.0",
+    "command-exists": "^1.2.9",
+    "commander": "^5.1.0",
     "fluent-ffmpeg": "^2.1.2",
-    "fs-extra": "^8.1.0",
-    "moment": "^2.24.0",
-    "request": "^2.88.0",
-    "tmp": "^0.1.0"
+    "fs-extra": "^9.0.0",
+    "moment": "^2.25.3",
+    "request": "^2.88.2",
+    "tmp": "^0.2.0"
   }
 }
