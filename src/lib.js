@@ -1,4 +1,4 @@
-// Copyright (c) 2020, Thorsten A. Weintz. All rights reserved.
+// Copyright (c) 2021, Thorsten A. Weintz. All rights reserved.
 // Licensed under the MIT license. See LICENSE in the project root for license information.
 
 'use strict';
@@ -23,7 +23,7 @@ const log = console.log;
 const DATE_FORMAT = 'YYYYMMDD';
 
 /**
- * Time format used by IP Cameras
+ * Time format used by IP cameras
  */
 const TIME_FORMAT = 'HHmmss';
 
@@ -106,19 +106,18 @@ function validateRecordFilter(record, filter, start) {
  * @param {*} timeFilter Object with time filter
  */
 async function get264Entries(date, timeFilter) {
-    return new Promise(resolve => {
-        httpContentRequest(getRecordsDirectoryUrlByDate(date)).then(content => {
-            let entries = [];
-            getTableRowItems(content).forEach(entry => {
-                if (entry.indexOf('999999') === -1
-                    && validateRecordFilter(entry, timeFilter.start, true)
-                    && validateRecordFilter(entry, timeFilter.end)) {
-                    entries.push(entry);
-                }
-            });
-            resolve(entries);
-        });
+    let entries = [];
+
+    let content = await httpContentRequest(getRecordsDirectoryUrlByDate(date));
+    getTableRowItems(content).forEach(entry => {
+        if (entry.indexOf('999999') === -1
+            && validateRecordFilter(entry, timeFilter.start, true)
+            && validateRecordFilter(entry, timeFilter.end)) {
+            entries.push(entry);
+        }
     });
+
+    return entries;
 }
 
 /**
@@ -126,45 +125,40 @@ async function get264Entries(date, timeFilter) {
  * @param {*} date String value with date of records
  */
 async function getDateEntries(date) {
-    return new Promise((resolve, reject) => {
-        if (date) {
-            resolve([date]);
-        } else {
-            httpContentRequest(ipcamsd.settings.baseUrl).then(content => {
-                let dates = getTableRowItems(content).map(value => {
-                    return value.slice(0, -1);
-                });
-                resolve(dates);
-            }, (err) => reject(err));
-        }
-    });
+    if (!date) {
+        let content = await httpContentRequest(ipcamsd.settings.baseUrl);
+        return getTableRowItems(content).map(value => value.slice(0, -1));
+    }
+
+    return [ date ];
 }
 
 /**
  * Requests all records of specified host
  */
 async function getRecords() {
-    return new Promise((resolve, reject) => {
-        let dateTimeFilter = ipcamsd.settings.dateTimeFilter;
-        let date = getDateByParameters(dateTimeFilter.date);
+    let dates = [];
 
-        getDateEntries(date).then(async entries => {
-            let dates = [];
+    let dateTimeFilter = ipcamsd.settings.dateTimeFilter;
+    let date = getDateByParameters(dateTimeFilter.date);
 
-            for (let i = 0; i < entries.length; i++) {
-                let value = entries[i];
-                await get264Entries(value, dateTimeFilter.time).then(records => {
-                    dates.push({
-                        date: value,
-                        records: records
-                    });
-                    if (entries.length == dates.length) {
-                        resolve(dates);
-                    }
-                });
-            }
-        }, (err) => reject(err));
-    });
+    let entries = await getDateEntries(date);
+    for (let i = 0; i < entries.length; i++) {
+        let value = entries[i];
+
+        let records = await get264Entries(value, dateTimeFilter.time);
+
+        dates.push({
+            date: value,
+            records: records
+        });
+
+        if (entries.length == dates.length) {
+            break;
+        }
+    }
+
+    return dates;
 }
 
 /**
@@ -206,7 +200,7 @@ function addVideoFilter(ffmpegCmd) {
  * @param {*} dateObj Object with date and Array of records
  * @param {*} tmpDir Temporary directory with source entries
  */
-async function concatenateAndConvertToTargetFile(dateObj, tmpDir) {
+function concatenateAndConvertToTargetFile(dateObj, tmpDir) {
     return new Promise(resolve => {
         let ffmpegCmd = ffmpeg();
         let recordsFile = createFileList(dateObj, tmpDir);
@@ -257,32 +251,29 @@ async function downloadAndConvertRecordFiles(dateObj, dateTmpDir) {
  * @param {*} tmpDir Temporary directory for target files
  */
 async function transferConvertMerge264Files(dates, tmpDir) {
-    return new Promise(async resolve => {
-        for (let i = 0; i < dates.length; i++) {
-            let dateObj = dates[i];
+    for (let i = 0; i < dates.length; i++) {
+        let dateObj = dates[i];
 
-            if (dateObj.records.length > 0) {
-                log(chalk.blue(dateObj.date));
+        if (dateObj.records.length > 0) {
+            log(chalk.blue(dateObj.date));
 
-                let dateTmpDir = tmpDir.name + '\\' + dateObj.date;
-                fs.mkdirSync(dateTmpDir);
-    
-                log(chalk.magenta('Download and convert record files'));
-                await downloadAndConvertRecordFiles(dateObj, dateTmpDir);
-    
-                log(chalk.magenta('Merging with ffmpeg'));
-                await concatenateAndConvertToTargetFile(dateObj, dateTmpDir);   
-            }
+            let dateTmpDir = tmpDir.name + '\\' + dateObj.date;
+            fs.mkdirSync(dateTmpDir);
+
+            log(chalk.magenta('Download and convert record files'));
+            await downloadAndConvertRecordFiles(dateObj, dateTmpDir);
+
+            log(chalk.magenta('Merging with ffmpeg'));
+            await concatenateAndConvertToTargetFile(dateObj, dateTmpDir);   
         }
-        resolve();
-    });
+    }
 }
 
 /**
  * Gets body string of HTTP content
  * @param {*} url Target content URL
  */
-async function httpContentRequest(url) {
+function httpContentRequest(url) {
     return new Promise((resolve, reject) => {
         request.get({ url: url, headers: ipcamsd.settings.headers }, (error, response, body) => {
             if (!error && response.statusCode == 200) {
@@ -299,7 +290,7 @@ async function httpContentRequest(url) {
  * @param {*} url Target content URL
  * @param {*} filename Target file name
  */
-async function httpContentToFileStream(url, filename) {
+function httpContentToFileStream(url, filename) {
     return new Promise(resolve => {
         let receivedBytes = 0;
         let totalBytes = 0;

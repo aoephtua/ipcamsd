@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Copyright (c) 2020, Thorsten A. Weintz. All rights reserved.
+// Copyright (c) 2021, Thorsten A. Weintz. All rights reserved.
 // Licensed under the MIT license. See LICENSE in the project root for license information.
 
 'use strict';
@@ -13,7 +13,7 @@ function collect(value, previous) {
 }
 
 program
-    .version('0.1.8', '-v, --version')
+    .version('0.1.9', '-v, --version')
     .option('-d, --date <yyyymmdd|today|yesterday>', 'date of records')
     .option('-s, --time-start <hhmmss>', 'start time of records (name filter)')
     .option('-e, --time-end <hhmmss>', 'end time of records (name filter)')
@@ -29,26 +29,28 @@ program
 
 program.parse(process.argv);
 
-if (!program.host) {
+const options = program.opts();
+
+if (!options.host) {
     console.error('error: option \'-h, --host <value>\' argument missing');
     program.outputHelp();
     process.exit(1);
 }
 
 let dateTimeFilter = {
-    date: program.date,
+    date: options.date,
     time: {
-        start: program.timeStart,
-        end: program.timeEnd
+        start: options.timeStart,
+        end: options.timeEnd
     },
-    lastMinutes: program.lastMinutes,
-    startDelay: program.startDelay
+    lastMinutes: options.lastMinutes,
+    startDelay: options.startDelay
 };
 
 let ffmpegParams = {
-    videoFilter: program.videoFilter,
-    targetFileType: program.targetFileType
+    videoFilter: options.videoFilter,
+    targetFileType: options.targetFileType
 };
 
-ipcamsd.process(dateTimeFilter, program.targetDirectory, ffmpegParams, program.host, program.username, program.password, program.ssl)
+ipcamsd.process(dateTimeFilter, options.targetDirectory, ffmpegParams, options.host, options.username, options.password, options.ssl)
     .then(null, (err) => console.error(err));
