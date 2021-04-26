@@ -21,8 +21,9 @@ program
     .option('-i, --start-delay <number>', 'start delay in minutes', parseInt)
     .option('-t, --target-directory <dir>', 'target directory for converted files')
     .option('-y, --target-file-type <type>', 'target file type used by ffmpeg for conversion')
+    .option('-x, --filename-prefix <prefix>', 'output filename prefix')
     .option('-f, --video-filter <filter>', 'video filter in ffmpeg required format', collect, [])
-    .option('-h, --host <host>', 'host of ip camera')
+    .option('-h, --host <host...>', 'host of ip camera')
     .option('-u, --username <username>', 'username for basic authentication')
     .option('-p, --password <password>', 'password for basic authentication')
     .option('--ssl', 'use secure socket layer', false);
@@ -52,5 +53,10 @@ let ffmpegParams = {
     targetFileType: options.targetFileType
 };
 
-ipcamsd.process(dateTimeFilter, options.targetDirectory, ffmpegParams, options.host, options.username, options.password, options.ssl)
+let fsParams = {
+    directory: options.targetDirectory,
+    prefix: options.filenamePrefix
+};
+
+ipcamsd.process(dateTimeFilter, fsParams, ffmpegParams, options.host, options.username, options.password, options.ssl)
     .then(null, (err) => console.error(err));

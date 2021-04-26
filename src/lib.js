@@ -370,7 +370,7 @@ function getFileTypeByFfmpegParams() {
 }
 
 /**
- * Gets target file name by date time filter
+ * Gets target file name by date time filter and custom parameters
  * @param {*} dateObj Object with date and Array of records
  */
 function getFilenameByTimeFilter(dateObj) {
@@ -387,7 +387,18 @@ function getFilenameByTimeFilter(dateObj) {
         }
     }
 
-    return date + '.' + getFileTypeByFfmpegParams();
+    let prefix = getFilenamePrefix();
+
+    return prefix + date + '.' + getFileTypeByFfmpegParams();
+}
+
+/**
+ * Gets filename prefix by custom user value and host
+ */
+function getFilenamePrefix() {
+    let prefix = ipcamsd.settings.prefix;
+    let sep = '_';
+    return (prefix ? prefix + sep : '') + ipcamsd.settings.host + sep;
 }
 
 /**
@@ -412,42 +423,68 @@ function calculateStartDelayInMs(dateTimeFilter) {
 }
 
 /**
+ * Starts main working process of command line tool
+ */
+function startMainWorkingProcess() {
+    return new Promise((resolve, reject) => {
+        let timeFilterObj = ipcamsd.settings.dateTimeFilter.time;
+        timeFilterObj.start = processRecordFilter(timeFilterObj.start);
+        timeFilterObj.end = processRecordFilter(timeFilterObj.end);
+    
+        let tmpDir = tmp.dirSync({ prefix: 'ipcamsd' });
+    
+        getRecords().then(dates => {
+            transferConvertMerge264Files(dates, tmpDir).then(() => {
+                fs.removeSync(tmpDir.name);
+                resolve();
+            }, (err) => reject(err));
+        });
+    });
+}
+
+/**
+ * Iterates host values and starts main working process
+ * @param {*} hosts Array with host values
+ * @param {*} ssl Use secure socket layer
+ */
+async function iterateHosts(hosts, ssl) {
+    for (const host of hosts) {
+        log(chalk.yellow(host));
+        ipcamsd.settings = {
+            ...ipcamsd.settings,
+            host: host,
+            baseUrl: 'http' + (ssl ? 's' :'' ) + `://${host}/sd`
+        };
+        await startMainWorkingProcess();
+    }
+}
+
+/**
  * Transfers, converts and merges .246 files to target directory
  * @param {*} dateTimeFilter Object with date and time filter
- * @param {*} directory Target directory for output files
+ * @param {*} fsParams File system specified parameters for output file
  * @param {*} ffmpegParams Parameters in ffmpeg required format
- * @param {*} host Host of IP camera
+ * @param {*} hosts Hosts of IP camera
  * @param {*} username Username for basic authentication
  * @param {*} password Password for basic authentication
  * @param {*} ssl Use secure socket layer as transport protocol
  */
-ipcamsd.process = async (dateTimeFilter, directory, ffmpegParams, host, username, password, ssl) => new Promise((resolve, reject) => {
+ipcamsd.process = async (dateTimeFilter, fsParams, ffmpegParams, hosts, username, password, ssl) => new Promise((resolve, reject) => {
     commandExists('ffmpeg')
         .then(() => {
             let startDelay = calculateStartDelayInMs(dateTimeFilter);
             setTimeout(() => {
                 ipcamsd.settings = {
                     dateTimeFilter: validateDateTimeFilter(dateTimeFilter),
-                    directory: directory,
+                    directory: fsParams.directory,
+                    prefix: fsParams.prefix,
                     ffmpegParams: ffmpegParams,
-                    baseUrl: 'http' + (ssl ? 's' :'' ) + `://${host}/sd`,
-                    username: username, 
+                    username: username,
                     password: password,
                     headers: getHeadersForBasicAuthentication(username, password)
                 };
-    
-                let timeFilterObj = ipcamsd.settings.dateTimeFilter.time;
-                timeFilterObj.start = processRecordFilter(timeFilterObj.start);
-                timeFilterObj.end = processRecordFilter(timeFilterObj.end);
-            
-                let tmpDir = tmp.dirSync({ prefix: 'ipcamsd' });
-            
-                getRecords().then(dates => {
-                    transferConvertMerge264Files(dates, tmpDir).then(() => {
-                        fs.removeSync(tmpDir.name);
-                        resolve();
-                    }, (err) => reject(err));
-                });
+
+                iterateHosts(hosts, ssl).then(() => resolve());
             }, startDelay);
         })
         .catch(() => {
