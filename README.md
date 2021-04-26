@@ -30,8 +30,9 @@ Options:
   -i, --start-delay <number>             start delay in minutes
   -t, --target-directory <dir>           target directory for converted files
   -y, --target-file-type <type>          target file type used by ffmpeg for conversion (default: mp4)
+  -x, --filename-prefix <prefix>         output filename prefix
   -f, --video-filter <filter>            video filter in ffmpeg required format (default: [])
-  -h, --host <host>                      host of ip camera
+  -h, --host <host...>                   host of ip camera
   -u, --username <username>              username for basic authentication
   -p, --password <password>              password for basic authentication
   --ssl                                  use secure socket layer (default: false)
