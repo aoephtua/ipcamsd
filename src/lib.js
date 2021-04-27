@@ -461,30 +461,27 @@ async function iterateHosts(hosts, ssl) {
 
 /**
  * Transfers, converts and merges .246 files to target directory
- * @param {*} dateTimeFilter Object with date and time filter
- * @param {*} fsParams File system specified parameters for output file
- * @param {*} ffmpegParams Parameters in ffmpeg required format
  * @param {*} hosts Hosts of IP camera
- * @param {*} username Username for basic authentication
- * @param {*} password Password for basic authentication
- * @param {*} ssl Use secure socket layer as transport protocol
+ * @param {*} params Object with values of CLI options in required format
  */
-ipcamsd.process = async (dateTimeFilter, fsParams, ffmpegParams, hosts, username, password, ssl) => new Promise((resolve, reject) => {
+ipcamsd.process = async (hosts, params) => new Promise((resolve, reject) => {
     commandExists('ffmpeg')
         .then(() => {
-            let startDelay = calculateStartDelayInMs(dateTimeFilter);
+            let username = params.auth.username;
+            let password = params.auth.password;
+            let startDelay = calculateStartDelayInMs(params.dateTime);
             setTimeout(() => {
                 ipcamsd.settings = {
-                    dateTimeFilter: validateDateTimeFilter(dateTimeFilter),
-                    directory: fsParams.directory,
-                    prefix: fsParams.prefix,
-                    ffmpegParams: ffmpegParams,
+                    dateTimeFilter: validateDateTimeFilter(params.dateTime),
+                    directory: params.fs.directory,
+                    prefix: params.fs.prefix,
+                    ffmpegParams: params.ffmpeg,
                     username: username,
                     password: password,
                     headers: getHeadersForBasicAuthentication(username, password)
                 };
 
-                iterateHosts(hosts, ssl).then(() => resolve());
+                iterateHosts(hosts, params.auth.ssl).then(() => resolve());
             }, startDelay);
         })
         .catch(() => {

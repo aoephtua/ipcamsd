@@ -31,32 +31,38 @@ program
 program.parse(process.argv);
 
 const options = program.opts();
+const hosts = options.host;
 
-if (!options.host) {
+if (!hosts) {
     console.error('error: option \'-h, --host <value>\' argument missing');
     program.outputHelp();
     process.exit(1);
 }
 
-let dateTimeFilter = {
-    date: options.date,
-    time: {
-        start: options.timeStart,
-        end: options.timeEnd
+let params = {
+    auth: {
+        username: options.username,
+        password: options.password,
+        ssl: options.ssl
     },
-    lastMinutes: options.lastMinutes,
-    startDelay: options.startDelay
+    fs: {
+        directory: options.targetDirectory,
+        prefix: options.filenamePrefix
+    },
+    ffmpeg: {
+        videoFilter: options.videoFilter,
+        targetFileType: options.targetFileType
+    },
+    dateTime: {
+        date: options.date,
+        time: {
+            start: options.timeStart,
+            end: options.timeEnd
+        },
+        lastMinutes: options.lastMinutes,
+        startDelay: options.startDelay
+    }
 };
 
-let ffmpegParams = {
-    videoFilter: options.videoFilter,
-    targetFileType: options.targetFileType
-};
-
-let fsParams = {
-    directory: options.targetDirectory,
-    prefix: options.filenamePrefix
-};
-
-ipcamsd.process(dateTimeFilter, fsParams, ffmpegParams, options.host, options.username, options.password, options.ssl)
+ipcamsd.process(hosts, params)
     .then(null, (err) => console.error(err));
