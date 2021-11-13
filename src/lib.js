@@ -265,6 +265,8 @@ async function transferConvertMerge264Files(dates, tmpDir) {
 
             log(chalk.magenta('Merging with ffmpeg'));
             await concatenateAndConvertToTargetFile(dateObj, dateTmpDir);   
+        } else {
+            log(chalk.magenta('No records found'));
         }
     }
 }
