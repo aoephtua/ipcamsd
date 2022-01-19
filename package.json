@@ -26,11 +26,11 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "chalk": "^4.1.1",
+    "chalk": "^4.1.2",
     "cheerio": "^1.0.0-rc.6",
     "chipcaco": "^0.1.1",
     "command-exists": "^1.2.9",
-    "commander": "^8.2.0",
+    "commander": "^8.3.0",
     "fluent-ffmpeg": "^2.1.2",
     "fs-extra": "^10.0.0",
     "moment": "^2.29.1",

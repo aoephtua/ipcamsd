@@ -1,4 +1,4 @@
-// Copyright (c) 2021, Thorsten A. Weintz. All rights reserved.
+// Copyright (c) 2022, Thorsten A. Weintz. All rights reserved.
 // Licensed under the MIT license. See LICENSE in the project root for license information.
 
 'use strict';
@@ -140,13 +140,13 @@ async function getRecords() {
     let dates = [];
 
     let dateTimeFilter = ipcamsd.settings.dateTimeFilter;
-    let date = getDateByParameters(dateTimeFilter.date);
+    let date = getDateByParameters(dateTimeFilter?.date);
 
     let entries = await getDateEntries(date);
     for (let i = 0; i < entries.length; i++) {
         let value = entries[i];
 
-        let records = await get264Entries(value, dateTimeFilter.time);
+        let records = await get264Entries(value, dateTimeFilter?.time || {});
 
         dates.push({
             date: value,
@@ -238,7 +238,7 @@ async function downloadAndConvertRecordFiles(dateObj, dateTmpDir) {
         let localFile = dateTmpDir + '\\' + record;
         await httpContentToFileStream(fileUrl, localFile);
 
-        log(chalk.magenta('Converting with chipcaco'));
+        log(chalk.cyan('Converting with chipcaco'));
         let localConvFile = localFile + '_';
         await chipcaco.file(localFile, localConvFile);
         fs.moveSync(localConvFile, localFile, { overwrite: true });
@@ -255,18 +255,18 @@ async function transferConvertMerge264Files(dates, tmpDir) {
         let dateObj = dates[i];
 
         if (dateObj.records.length > 0) {
-            log(chalk.blue(dateObj.date));
+            log(chalk.magenta(dateObj.date));
 
             let dateTmpDir = tmpDir.name + '\\' + dateObj.date;
             fs.mkdirSync(dateTmpDir);
 
-            log(chalk.magenta('Download and convert record files'));
+            log(chalk.cyan('Download and convert record files'));
             await downloadAndConvertRecordFiles(dateObj, dateTmpDir);
 
-            log(chalk.magenta('Merging with ffmpeg'));
+            log(chalk.cyan('Merging with ffmpeg'));
             await concatenateAndConvertToTargetFile(dateObj, dateTmpDir);   
         } else {
-            log(chalk.magenta('No records found'));
+            log(chalk.cyan('No records found'));
         }
     }
 }
@@ -425,9 +425,9 @@ function calculateStartDelayInMs(dateTimeFilter) {
 }
 
 /**
- * Starts main working process of command line tool
+ * Starts process to fetch records
  */
-function startMainWorkingProcess() {
+function startFetchingRecordsProcess() {
     return new Promise((resolve, reject) => {
         let timeFilterObj = ipcamsd.settings.dateTimeFilter.time;
         timeFilterObj.start = processRecordFilter(timeFilterObj.start);
@@ -445,19 +445,20 @@ function startMainWorkingProcess() {
 }
 
 /**
- * Iterates host values and starts main working process
+ * Iterates host values and starts working process
  * @param {*} hosts Array with host values
  * @param {*} ssl Use secure socket layer
+ * @param {*} cbProcess Working process callback
  */
-async function iterateHosts(hosts, ssl) {
+async function iterateHosts(hosts, ssl, cbProcess) {
     for (const host of hosts) {
-        log(chalk.yellow(host));
+        log(chalk.green.bold(host));
         ipcamsd.settings = {
             ...ipcamsd.settings,
-            host: host,
+            host,
             baseUrl: 'http' + (ssl ? 's' :'' ) + `://${host}/sd`
         };
-        await startMainWorkingProcess();
+        await cbProcess();
     }
 }
 
@@ -465,8 +466,9 @@ async function iterateHosts(hosts, ssl) {
  * Transfers, converts and merges .246 files to target directory
  * @param {*} hosts Hosts of IP camera
  * @param {*} params Object with values of CLI options in required format
+ * @returns Promise object with success and error callbacks
  */
-ipcamsd.process = async (hosts, params) => new Promise((resolve, reject) => {
+ipcamsd.fetch = async (hosts, params) => new Promise((resolve, reject) => {
     commandExists('ffmpeg')
         .then(() => {
             let username = params.auth.username;
@@ -478,15 +480,79 @@ ipcamsd.process = async (hosts, params) => new Promise((resolve, reject) => {
                     directory: params.fs.directory,
                     prefix: params.fs.prefix,
                     ffmpegParams: params.ffmpeg,
-                    username: username,
-                    password: password,
+                    username,
+                    password,
                     headers: getHeadersForBasicAuthentication(username, password)
                 };
 
-                iterateHosts(hosts, params.auth.ssl).then(() => resolve());
+                iterateHosts(hosts, params.auth.ssl, startFetchingRecordsProcess)
+                    .then(resolve);
             }, startDelay);
         })
         .catch(() => {
             reject('ffmpeg not installed');
         });
 });
+
+/**
+ * Lists date entries with records range of hosts
+ * @param {*} auth Object with authentication properties
+ * @returns Promise object with success and error callbacks
+ */
+ipcamsd.list = async (auth) => new Promise(resolve => {
+    ipcamsd.settings = {
+        headers: getHeadersForBasicAuthentication(auth.username, auth.password)
+    };
+    iterateHosts(auth.hosts, auth.ssl, async () => {
+        await getRecords().then(dates => {
+            for (let date of dates) {
+                log(chalk.magenta(date.date));
+                let records = date.records;
+                if (records && records.length > 0) {
+                    let first = records[0];
+                    let last = records.length > 1 ? ' - ' + records[records.length - 1] : '';
+                    log(chalk.white(first + last));
+                }
+            }
+        });
+    }).then(resolve);
+});
+
+/**
+ * Processes parameters and executes command
+ * @param {*} name Name of command
+ * @param {*} auth Object with authentication properties
+ * @param {*} options Object with additional options for specified command
+ * @returns Promise object with success and error callbacks
+ */
+ipcamsd.process = async (name, auth, options) => {
+    switch (name || 'fetch') {
+        case 'fetch':
+            return ipcamsd.fetch(auth.hosts, {
+                auth: {
+                    username: auth.username,
+                    password: auth.password,
+                    ssl: auth.ssl
+                },
+                fs: {
+                    directory: options.targetDirectory,
+                    prefix: options.filenamePrefix
+                },
+                ffmpeg: {
+                    videoFilter: options.videoFilter,
+                    targetFileType: options.targetFileType
+                },
+                dateTime: {
+                    date: options.date,
+                    time: {
+                        start: options.timeStart,
+                        end: options.timeEnd
+                    },
+                    lastMinutes: options.lastMinutes,
+                    startDelay: options.startDelay
+                }
+            });
+        case 'list':
+            return ipcamsd.list(auth);
+    }
+};
