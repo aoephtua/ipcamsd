@@ -58,6 +58,8 @@ Outputs dates and (first, last) records of specified hosts.
 
     $ ipcamsd list --host [IP...] --username admin --password admin
 
+Use **[ipcamsd-cmd-generator](https://github.com/aoephtua/ipcamsd-cmd-generator)** to generate commands for ipcamsd.
+
 ## Compatibility
 
 - bedee WLAN IP Camera 1080p (IR, Outdoor, hi3510 firmware)
