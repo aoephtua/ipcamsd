@@ -184,9 +184,9 @@ function createFileList(dateObj, dir) {
  * @param {*} ffmpegCmd Instance of fluent-ffmpeg
  */
 function addVideoFilter(ffmpegCmd) {
-    let videoFilter = ipcamsd.settings.ffmpegParams.videoFilter;
+    let videoFilter = ipcamsd.settings.ffmpegParams?.videoFilter;
 
-    if (videoFilter.length > 0) {
+    if (videoFilter?.length > 0) {
         videoFilter.forEach(filter => {
             ffmpegCmd.videoFilters(filter);
         });
@@ -364,7 +364,7 @@ function processRecordFilter(filter) {
 function getFileTypeByFfmpegParams() {
     let ffmpegParams = ipcamsd.settings.ffmpegParams;
 
-    if (ffmpegParams.targetFileType) {
+    if (ffmpegParams?.targetFileType) {
         return ffmpegParams.targetFileType.toLowerCase();
     }
     
@@ -477,8 +477,8 @@ ipcamsd.fetch = async (hosts, params) => new Promise((resolve, reject) => {
             setTimeout(() => {
                 ipcamsd.settings = {
                     dateTimeFilter: validateDateTimeFilter(params.dateTime),
-                    directory: params.fs.directory,
-                    prefix: params.fs.prefix,
+                    directory: params.fs?.directory,
+                    prefix: params.fs?.prefix,
                     ffmpegParams: params.ffmpeg,
                     username,
                     password,
