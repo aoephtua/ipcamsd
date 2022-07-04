@@ -11,7 +11,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs-extra');
 const moment = require('moment');
 const path = require("path");
-const request = require('request');
+const axios = require('axios').default;
 const tmp = require('tmp');
 
 const ipcamsd = module.exports;
@@ -38,9 +38,8 @@ const DEFAULT_TARGET_FILE_TYPE = 'mp4';
  */
 String.prototype.extractTimeValue = function(start) {
     let value = this.valueOf();
-    const length = 6;
 
-    return start ? value.substr(8, length) : value.substr(15, length);
+    return start ? value.slice(8, 14) : value.slice(15, 21);
 };
 
 /**
@@ -274,50 +273,60 @@ async function transferConvertMerge264Files(dates, tmpDir) {
 /**
  * Gets body string of HTTP content
  * @param {*} url Target content URL
+ * @returns Response data provided by the endpoint
  */
-function httpContentRequest(url) {
-    return new Promise((resolve, reject) => {
-        request.get({ url: url, headers: ipcamsd.settings.headers }, (error, response, body) => {
-            if (!error && response.statusCode == 200) {
-                resolve(body);
-            } else {
-                reject(error || `error: http status code ${response.statusCode}`);
-            }
-        });
-    });
+async function httpContentRequest(url) {
+    let response = await axios.get(url, { headers: ipcamsd.settings.headers });
+
+    if (response.status == 200) {
+        return response.data;
+    } else {
+        throw new Error(response.status);
+    }
 }
 
 /**
  * Transfers HTTP content to file stream by URL
- * @param {*} url Target content URL
+ * @param {*} fileUrl Target content URL
  * @param {*} filename Target file name
  */
-function httpContentToFileStream(url, filename) {
-    return new Promise(resolve => {
-        let receivedBytes = 0;
-        let totalBytes = 0;
+async function httpContentToFileStream(fileUrl, filename) {
+    const writeStream  = fs.createWriteStream(filename);
 
-        let httpRequest = request({
-            url: url,
-            headers: ipcamsd.settings.headers
+    const { data, headers} = await axios({
+        method: 'GET',
+        url: fileUrl,
+        headers: ipcamsd.settings.headers,
+        responseType: 'stream'
+    });
+
+    let receivedBytes = 0;
+    const totalBytes = headers['content-length'];
+
+    data.on('data', chunk => {
+        receivedBytes += chunk.length;
+        process.stdout.clearLine();
+        process.stdout.cursorTo(0);
+        process.stdout.write(path.basename(filename) + ': ' + parseInt(receivedBytes * 100 / totalBytes) + '%');
+    });
+
+    return new Promise((resolve, reject) => {
+        let error = null;
+
+        data.pipe(writeStream);
+
+        writeStream.on('error', err => {
+            error = err;
+            writeStream .close();
+            reject(err);
         });
 
-        httpRequest.pipe(fs.createWriteStream(filename));
-    
-        httpRequest
-            .on('response', data => {
-                totalBytes = parseInt(data.headers['content-length']);
-            })
-            .on('data', chunk => {
-                receivedBytes += chunk.length;
-                process.stdout.clearLine();
-                process.stdout.cursorTo(0);
-                process.stdout.write(path.basename(filename) + ': ' + parseInt(receivedBytes * 100 / totalBytes) + '%');
-            })
-            .on('end', () => {
+        writeStream .on('close', () => {
+            if (!error) {
                 process.stdout.write('\n');
-                resolve();
-            });
+                resolve(true);
+            }
+        });
     });
 }
 

@@ -6,9 +6,6 @@
   "bin": {
     "ipcamsd": "./src/cli.js"
   },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "author": {
     "name": "Thorsten A. Weintz"
   },
@@ -18,6 +15,7 @@
   },
   "keywords": [
     "bedee",
+    "hi3510",
     "h264",
     "h.264",
     "ip-camera",
@@ -26,15 +24,15 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "axios": "^0.27.2",
     "chalk": "^4.1.2",
-    "cheerio": "^1.0.0-rc.6",
+    "cheerio": "^1.0.0-rc.12",
     "chipcaco": "^0.1.1",
     "command-exists": "^1.2.9",
-    "commander": "^8.3.0",
+    "commander": "^9.3.0",
     "fluent-ffmpeg": "^2.1.2",
-    "fs-extra": "^10.0.0",
+    "fs-extra": "^10.1.0",
     "moment": "^2.29.1",
-    "request": "^2.88.2",
     "tmp": "^0.2.0"
   }
 }
