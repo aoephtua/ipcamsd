@@ -16,12 +16,12 @@ Node.js command line tool and library for downloading, merging and converting .2
 
 ```
 Options:
-  -v, --version              output the version number
-  -h, --host <host...>       host of ip camera (multiple: true, required)
-  -u, --username <username>  username for basic authentication
-  -p, --password <password>  password for basic authentication
-  --ssl                      use secure socket layer (default: false)
-  --help                     display help for command
+  --version              output the version number
+  --host <host...>       host of ip camera (multiple: true, required)
+  --username <username>  username for basic authentication
+  --password <password>  password for basic authentication
+  --ssl                  use secure socket layer (default: false)
+  --help                 display help for command
 ```
 
 ### Commands
@@ -41,15 +41,17 @@ Date and time filters are applied to the file names. Exact time limitation is cu
 
 ```
 Options:
-  -d, --date <yyyymmdd|today|yesterday>  date of records
-  -s, --time-start <hhmmss>              start time of records (name filter)
-  -e, --time-end <hhmmss>                end time of records (name filter)
-  -l, --last-minutes <number>            last minutes of records till now (start time skipped)
-  -i, --start-delay <number>             start delay in minutes
-  -t, --target-directory <dir>           target directory for converted files
-  -y, --target-file-type <type>          target file type used by ffmpeg for conversion
-  -x, --filename-prefix <prefix>         output filename prefix
-  -f, --video-filter <filter>            video filter in ffmpeg required format (default: [])
+  --start-date <yyyymmdd|today|yesterday>  start date of records
+  --end-date <yyyymmdd|today|yesterday>    end date of records
+  --start-time <hhmmss>                    start time of records (filter is applied to record name)
+  --end-time <hhmmss>                      end time of records (filter is applied to record name)
+  --separate                               separate by date (default: false)
+  --last-minutes <number>                  last minutes of records till now (start time skipped)
+  --start-delay <number>                   start delay in minutes
+  --target-directory <dir>                 target directory for converted files
+  --target-file-type <type>                target file type used by ffmpeg for conversion
+  --filename-prefix <prefix>               output filename prefix
+  --video-filter <filter>                  video filter in ffmpeg required format (default: [])
 ```
 
 #### list

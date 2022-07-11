@@ -33,6 +33,13 @@ const TIME_FORMAT = 'HHmmss';
 const DEFAULT_TARGET_FILE_TYPE = 'mp4';
 
 /**
+ * Extracts date value from file name of record
+ */
+ String.prototype.extractDateValue = function() {
+    return this.valueOf().slice(1, 7);
+};
+
+/**
  * Extracts time value from file name of record
  * @param {*} start Start or end time
  */
@@ -40,6 +47,13 @@ String.prototype.extractTimeValue = function(start) {
     let value = this.valueOf();
 
     return start ? value.slice(8, 14) : value.slice(15, 21);
+};
+
+/**
+ * Extracts file name from file path of record
+ */
+String.prototype.extractFilename = function() {
+    return this.valueOf().split('\\').reverse()[0];
 };
 
 /**
@@ -82,36 +96,37 @@ function getTableRowItems(body) {
 }
 
 /**
- * Validates time filter of record entries
+ * Validates date and time filter of record entries
+ * @param {*} date Parent date of record entry
  * @param {*} record File name of record entry
- * @param {*} filter Time filter for record entry
- * @param {*} start Apply >= or <= operator
+ * @param {*} filter Date and time filter
  */
-function validateRecordFilter(record, filter, start) {
-    if (!filter) {
-        return true;
-    }
+function isValidRecord(date, record, filter) {
+    let startFilter = `${filter.date.start || '000000'}_${filter.time.start || '000000'}`;
+    let endFilter = `${filter.date.end || '999999'}_${filter.time.end || '999999'}`;
 
-    let recFrom = record.extractTimeValue(true);
-    let recTo = record.extractTimeValue();
+    let startTime = record.extractTimeValue(true);
+    let endTime = record.extractTimeValue();
 
-    return start ? recFrom >= filter || recTo >= filter :
-        recFrom <= filter || recTo <= filter;
+    let startDate = `${date}_${startTime}`;
+    let endDate = `${date}_${endTime}`;
+
+    return (startDate >= startFilter || endDate >= startFilter)
+        && (endDate <= endFilter || startDate <= endFilter);
 }
 
 /**
  * Requests HTML body of records by date
  * @param {*} date String value with date of records
- * @param {*} timeFilter Object with time filter
+ * @param {*} dateTimeFilter Object with date and time filter
  */
-async function get264Entries(date, timeFilter) {
+async function get264Entries(date, dateTimeFilter) {
     let entries = [];
 
     let content = await httpContentRequest(getRecordsDirectoryUrlByDate(date));
     getTableRowItems(content).forEach(entry => {
-        if (entry.indexOf('999999') === -1
-            && validateRecordFilter(entry, timeFilter.start, true)
-            && validateRecordFilter(entry, timeFilter.end)) {
+        if (entry.indexOf('999999') === -1 
+            && isValidRecord(date, entry, dateTimeFilter)) {
             entries.push(entry);
         }
     });
@@ -121,15 +136,21 @@ async function get264Entries(date, timeFilter) {
 
 /**
  * Request date entries by parameters
- * @param {*} date String value with date of records
+ * @param {*} startDate String value with start date of records
+ * @param {*} endDate String value with end date of records
  */
-async function getDateEntries(date) {
-    if (!date) {
-        let content = await httpContentRequest(ipcamsd.settings.baseUrl);
-        return getTableRowItems(content).map(value => value.slice(0, -1));
+async function getDateEntries(startDate, endDate) {
+    let entries = [];
+    let content = await httpContentRequest(ipcamsd.settings.baseUrl);
+    let dates = getTableRowItems(content).map(value => value.slice(0, -1));
+
+    for (let date of dates) {
+        if ((!startDate || date >= startDate) && (!endDate || date <= endDate)) {
+            entries.push(date);
+        }
     }
 
-    return [ date ];
+    return entries;
 }
 
 /**
@@ -139,13 +160,14 @@ async function getRecords() {
     let dates = [];
 
     let dateTimeFilter = ipcamsd.settings.dateTimeFilter;
-    let date = getDateByParameters(dateTimeFilter?.date);
+    let startDate = dateTimeFilter.date.start;
+    let endDate = dateTimeFilter.date.end;
 
-    let entries = await getDateEntries(date);
+    let entries = await getDateEntries(startDate, endDate);
     for (let i = 0; i < entries.length; i++) {
         let value = entries[i];
 
-        let records = await get264Entries(value, dateTimeFilter?.time || {});
+        let records = await get264Entries(value, dateTimeFilter);
 
         dates.push({
             date: value,
@@ -162,14 +184,15 @@ async function getRecords() {
 
 /**
  * Creates .txt file with records paths in ffmpeg required format
- * @param {*} dateObj Object with date and Array of records
+ * @param {*} name String with name of .txt file
+ * @param {*} records Array with records
  * @param {*} dir Target directory of records
  */
-function createFileList(dateObj, dir) {
-    let fileName = dir + '\\' + `${dateObj.date}.txt`;
+function createFileList(name, records, dir) {
+    let fileName = dir + '\\' + `${name}.txt`;
     let file = fs.createWriteStream(fileName);
 
-    dateObj.records.forEach(record => { 
+    records.forEach(record => { 
         file.write(`file '${dir}\\${record}'` + '\r\n');
     });
 
@@ -196,13 +219,14 @@ function addVideoFilter(ffmpegCmd) {
 
 /**
  * Concatenates and converts .264 files to target file type
- * @param {*} dateObj Object with date and Array of records
- * @param {*} tmpDir Temporary directory with source entries
+ * @param {*} recordsFile String with source file name of records
+ * @param {*} fileName String with target file name
  */
-function concatenateAndConvertToTargetFile(dateObj, tmpDir) {
+function concatenateAndConvertToTargetFile(recordsFile, fileName) {
     return new Promise(resolve => {
         let ffmpegCmd = ffmpeg();
-        let recordsFile = createFileList(dateObj, tmpDir);
+
+        log(chalk.cyan('Merging with ffmpeg'));
 
         ffmpegCmd
             .on('progress', progress => {
@@ -218,7 +242,9 @@ function concatenateAndConvertToTargetFile(dateObj, tmpDir) {
             
         addVideoFilter(ffmpegCmd);
             
-        ffmpegCmd.save(path.join(ipcamsd.settings.directory || process.cwd(), getFilenameByTimeFilter(dateObj)));
+        const outputFile = path.join(ipcamsd.settings.directory || process.cwd(), fileName);
+
+        ffmpegCmd.save(outputFile);
     });
 }
 
@@ -245,29 +271,83 @@ async function downloadAndConvertRecordFiles(dateObj, dateTmpDir) {
 }
 
 /**
+ * Creates temporary directory for record files by date
+ * @param {*} tmpDir Parent temporary directory for dates
+ * @param {*} date String with date value
+ * @returns String with temporary directory for date
+ */
+function createTmpDirForDate(tmpDir, date) {
+    let dateTmpDir = tmpDir.name + '\\' + date;
+    fs.mkdirSync(dateTmpDir);
+
+    return dateTmpDir;
+}
+
+/**
+ * Creates separate records file by date and time parameters
+ * @param {*} dateObj Object with date time parameters
+ * @param {*} dateTmpDir String with temporary directory of date
+ */
+async function createSeparateRecordsFile(dateObj, dateTmpDir) {
+    let recordsFile = createFileList(dateObj.date, dateObj.records, dateTmpDir);
+
+    const fileName = getFilename(dateObj.records);
+    await concatenateAndConvertToTargetFile(recordsFile, fileName);
+}
+
+/**
+ * Creates single records file by date and time parameters
+ * @param {*} separate Contains whether to separate files
+ * @param {*} dates Array with dates and records
+ * @param {*} tmpDir Temporary directory for target files
+ */
+async function createSingleRecordsFile(separate, dates, tmpDir) {
+    if (!separate) {
+        let records = [];
+
+        dates.forEach(date => {
+            date.records.forEach(record => {
+                records.push(`${date.date}\\${record}`);
+            });
+        });
+
+        let recordsFile = createFileList('0000', records, tmpDir);
+
+        const fileName = getFilename(records);
+
+        await concatenateAndConvertToTargetFile(recordsFile, fileName);
+    }
+}
+
+/**
  * Transfers, converts and merges .264 files of dates
  * @param {*} dates Array with dates and records
  * @param {*} tmpDir Temporary directory for target files
  */
 async function transferConvertMerge264Files(dates, tmpDir) {
+    const separate = ipcamsd.settings.dateTimeFilter.separate;
+
     for (let i = 0; i < dates.length; i++) {
         let dateObj = dates[i];
 
         if (dateObj.records.length > 0) {
-            log(chalk.magenta(dateObj.date));
+            let date = dateObj.date;
+            log(chalk.magenta(date));
 
-            let dateTmpDir = tmpDir.name + '\\' + dateObj.date;
-            fs.mkdirSync(dateTmpDir);
+            let dateTmpDir = createTmpDirForDate(tmpDir, date);
 
             log(chalk.cyan('Download and convert record files'));
             await downloadAndConvertRecordFiles(dateObj, dateTmpDir);
 
-            log(chalk.cyan('Merging with ffmpeg'));
-            await concatenateAndConvertToTargetFile(dateObj, dateTmpDir);   
+            if (separate) {
+                await createSeparateRecordsFile(dateObj, dateTmpDir);
+            }
         } else {
             log(chalk.cyan('No records found'));
         }
     }
+
+    await createSingleRecordsFile(separate, dates, tmpDir.name);
 }
 
 /**
@@ -381,26 +461,43 @@ function getFileTypeByFfmpegParams() {
 }
 
 /**
- * Gets target file name by date time filter and custom parameters
- * @param {*} dateObj Object with date and Array of records
+ * Gets date and time parts by file name
+ * @param {*} value String with file name
+ * @returns Object with date and time parts as strings
  */
-function getFilenameByTimeFilter(dateObj) {
-    let date = dateObj.date;
-    let timeFilter = ipcamsd.settings.dateTimeFilter.time;
+function getDateAndTimeParts(value) {
+    let content = value.extractFilename();
 
-    if (timeFilter.start) {
-        date += `_${timeFilter.start}`;
-        if (timeFilter.end) {
-            date += `_${timeFilter.end}`;
-        } else {
-            let records = dateObj.records;
-            date += `_${records[records.length-1].extractTimeValue()}`;
+    return {
+        date: content.extractDateValue(),
+        start: content.extractTimeValue(true),
+        end: content.extractTimeValue()
+    };
+}
+
+/**
+ * Gets target file name by parameters of records
+ * @param {*} records Array with file names of records
+ * @returns String with target file name
+ */
+function getFilename(records) {
+    if (records.length > 0) {
+        let range, prefix = getFilenamePrefix();
+
+        let first = getDateAndTimeParts(records[0]);
+        range = `${first.date}_${first.start}`;
+
+        let last = records.length > 1
+            ? getDateAndTimeParts(records[records.length-1]) : null;
+        if (last) {
+            if (last.date !== first.date) {
+                range += `_${last.date}`;
+            }
+            range += `_${last.end}`;
         }
+
+        return `${prefix}${range}.${getFileTypeByFfmpegParams()}`;
     }
-
-    let prefix = getFilenamePrefix();
-
-    return prefix + date + '.' + getFileTypeByFfmpegParams();
 }
 
 /**
@@ -417,11 +514,19 @@ function getFilenamePrefix() {
  * @param {*} dateTimeFilter Object with date and time filter
  */
 function validateDateTimeFilter(dateTimeFilter) {
+    dateTimeFilter.date.start = getDateByParameters(dateTimeFilter.date.start);
+    dateTimeFilter.date.end = getDateByParameters(dateTimeFilter.date.end);
+
+    if (!dateTimeFilter.date.end) {
+        dateTimeFilter.date.end = dateTimeFilter.date.start;
+    }
+
     if (dateTimeFilter.lastMinutes) {
         let startDate = moment().subtract(dateTimeFilter.lastMinutes, 'minutes');
-        dateTimeFilter.date = startDate.format(DATE_FORMAT);
+        dateTimeFilter.date.start = startDate.format(DATE_FORMAT);
         dateTimeFilter.time.start = startDate.format(TIME_FORMAT);
     }
+
     return dateTimeFilter;
 }
 
@@ -552,11 +657,15 @@ ipcamsd.process = async (name, auth, options) => {
                     targetFileType: options.targetFileType
                 },
                 dateTime: {
-                    date: options.date,
-                    time: {
-                        start: options.timeStart,
-                        end: options.timeEnd
+                    date: {
+                        start: options.startDate,
+                        end: options.endDate
                     },
+                    time: {
+                        start: options.startTime,
+                        end: options.endTime
+                    },
+                    separate: options.separate,
                     lastMinutes: options.lastMinutes,
                     startDelay: options.startDelay
                 }

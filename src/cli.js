@@ -50,23 +50,25 @@ program
 
 addCommand('fetch', true, (command) => {
     command
-        .option('-d, --date <yyyymmdd|today|yesterday>', 'date of records')
-        .option('-s, --time-start <hhmmss>', 'start time of records (name filter)')
-        .option('-e, --time-end <hhmmss>', 'end time of records (name filter)')
-        .option('-l, --last-minutes <number>', 'last minutes of records till now (start time skipped)', parseInt)
-        .option('-i, --start-delay <number>', 'start delay in minutes', parseInt)
-        .option('-t, --target-directory <dir>', 'target directory for converted files')
-        .option('-y, --target-file-type <type>', 'target file type used by ffmpeg for conversion')
-        .option('-x, --filename-prefix <prefix>', 'output filename prefix')
-        .option('-f, --video-filter <filter>', 'video filter in ffmpeg required format', collect, []);
+        .option('--start-date <yyyymmdd|today|yesterday>', 'start date of records')
+        .option('--end-date <yyyymmdd|today|yesterday>', 'end date of records')
+        .option('--start-time <hhmmss>', 'start time of records (name filter)')
+        .option('--end-time <hhmmss>', 'end time of records (name filter)')
+        .option('--separate', 'separate by date', false)
+        .option('--last-minutes <number>', 'last minutes of records till now (start time skipped)', parseInt)
+        .option('--start-delay <number>', 'start delay in minutes', parseInt)
+        .option('--target-directory <dir>', 'target directory for converted files')
+        .option('--target-file-type <type>', 'target file type used by ffmpeg for conversion')
+        .option('--filename-prefix <prefix>', 'output filename prefix')
+        .option('--video-filter <filter>', 'video filter in ffmpeg required format', collect, []);
 });
 
 addCommand('list');
 
 program
-    .requiredOption('-h, --host <host...>', 'host of ip camera')
-    .option('-u, --username <username>', 'username for basic authentication')
-    .option('-p, --password <password>', 'password for basic authentication')
+    .requiredOption('--host <host...>', 'host of ip camera')
+    .option('--username <username>', 'username for basic authentication')
+    .option('--password <password>', 'password for basic authentication')
     .option('--ssl', 'use secure socket layer', false);
     
 program.parse(process.argv);
