@@ -1,6 +1,6 @@
 {
   "name": "ipcamsd",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Command line tool and library for downloading, merging and converting .264 files",
   "main": "./src/lib.js",
   "bin": {
