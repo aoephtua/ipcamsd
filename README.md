@@ -33,7 +33,7 @@ Options:
 
 Transfers and converts records of the specified parameters. This is the **default** command.
 
-    $ ipcamsd (fetch) --date [YYYYMMDD|today|yesterday] --video-filter "setpts=PTS/2" --host [IP...] --username admin --password admin
+    $ ipcamsd (fetch) --start-date [YYYYMMDD|today|yesterday] --video-filter "setpts=PTS/2" --host [IP...] --username admin --password admin
 
 **Note**: `-c copy` is applied to stream if array of video filter is empty. This also achieves the best speed. Add the `setpts` video filter with `PTS/30` to increase video speed up to 30x. Visit [documentation](https://ffmpeg.org/ffmpeg-filters.html) of FFmpeg to get more information about conceivable video filter parameters.
 
