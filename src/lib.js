@@ -311,11 +311,13 @@ async function createSingleRecordsFile(separate, dates, tmpDir) {
             });
         });
 
-        let recordsFile = createFileList('0000', records, tmpDir);
+        if (records.length > 0) {
+            let recordsFile = createFileList('0000', records, tmpDir);
 
-        const fileName = getFilename(records);
-
-        await concatenateAndConvertToTargetFile(recordsFile, fileName);
+            const fileName = getFilename(records);
+    
+            await concatenateAndConvertToTargetFile(recordsFile, fileName);
+        }
     }
 }
 
