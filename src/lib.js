@@ -496,6 +496,8 @@ function getFilename(records) {
                 range += `_${last.date}`;
             }
             range += `_${last.end}`;
+        } else {
+            range += `_${first.end}`;
         }
 
         return `${prefix}${range}.${getFileTypeByFfmpegParams()}`;
