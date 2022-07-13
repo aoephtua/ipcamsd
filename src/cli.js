@@ -46,7 +46,7 @@ function addCommand(name, isDefault, cbAddOptions) {
 }
 
 program
-    .version('0.3.1', '-v, --version');
+    .version('0.3.2', '-v, --version');
 
 addCommand('fetch', true, (command) => {
     command
