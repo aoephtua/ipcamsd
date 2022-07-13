@@ -102,8 +102,8 @@ function getTableRowItems(body) {
  * @param {*} filter Date and time filter
  */
 function isValidRecord(date, record, filter) {
-    let startFilter = `${filter.date.start || '000000'}_${filter.time.start || '000000'}`;
-    let endFilter = `${filter.date.end || '999999'}_${filter.time.end || '999999'}`;
+    let startFilter = `${filter.date?.start || '000000'}_${filter.time?.start || '000000'}`;
+    let endFilter = `${filter.date?.end || '999999'}_${filter.time?.end || '999999'}`;
 
     let startTime = record.extractTimeValue(true);
     let endTime = record.extractTimeValue();
@@ -159,9 +159,9 @@ async function getDateEntries(startDate, endDate) {
 async function getRecords() {
     let dates = [];
 
-    let dateTimeFilter = ipcamsd.settings.dateTimeFilter;
-    let startDate = dateTimeFilter.date.start;
-    let endDate = dateTimeFilter.date.end;
+    let dateTimeFilter = ipcamsd.settings.dateTimeFilter || {};
+    let startDate = dateTimeFilter.date?.start;
+    let endDate = dateTimeFilter.date?.end;
 
     let entries = await getDateEntries(startDate, endDate);
     for (let i = 0; i < entries.length; i++) {
