@@ -71,7 +71,8 @@ Use **[ipcamsd-cmd-generator](https://github.com/aoephtua/ipcamsd-cmd-generator)
 ## Compatibility
 
 - bedee WLAN IP Camera 1080p (IR, Outdoor, hi3510 firmware)
-- Reolink 5MP PoE RLC-510A-B
+- Reolink 5MP PoE RLC-510A/B
+- Reolink Video Doorbell PoE/WiFi
 
 ## Requirements
 
