@@ -4,6 +4,11 @@
 import chalk from 'chalk';
 
 /**
+ * Standard ouptput of process to write content.
+ */
+const stdout = process.stdout;
+
+/**
  * Prints content to stdout.
  * 
  * @param {string} content The content to print to stdout.
@@ -36,15 +41,15 @@ const logError = (content) => logMessage(`Error: ${content}`);
  * @param {string} value The value of progress to stdout.
  */
 const writeProgress = (name, value) => {
-    process.stdout.clearLine();
-    process.stdout.cursorTo(0);
-    process.stdout.write(`${name ? `${name}: ` : ''}${value}`);
+    stdout.clearLine();
+    stdout.cursorTo(0);
+    stdout.write(`${name ? `${name}: ` : ''}${value}`);
 };
 
 /**
  * Prints newline to stdout on progress end.
  */
-const endProgress = () => process.stdout.write('\n');
+const endProgress = () => stdout.write('\n');
 
 /**
  * Exports primary log function as default.
