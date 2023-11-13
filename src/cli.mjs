@@ -67,7 +67,7 @@ function addCommand(name, isDefault, cbAddOptions) {
  * Sets the program version to @see Command instance.
  */
 program
-    .version('1.0.0', '-v, --version');
+    .version('1.1.0', '-v, --version');
 
 /**
  * Adds command and related options to fetch records to @see Command instance.
