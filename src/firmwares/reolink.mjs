@@ -68,12 +68,14 @@ export default class Reolink extends Base {
      * @returns String with date part value.
      */
     extractDatePartValue(date, part, start) {
-        if (date) {
+        const value = date?.split(/_(.*)/s)[1];
+
+        if (value) {
             switch (part || 'date') {
                 case 'date':
-                    return date.slice(12, 18);
+                    return value.slice(2, 8);
                 case 'time':
-                    return start ? date.slice(19, 25) : date.slice(26, 32);
+                    return start ? value.slice(9, 15) : value.slice(16, 22);
             }
         }
     }
