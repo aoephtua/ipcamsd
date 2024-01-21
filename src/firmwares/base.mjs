@@ -240,7 +240,7 @@ export default class Base {
      */
     #logDownloadMessage(valid) {
         if (valid) {
-            logMessage(`1. Download${this.convertRecordFile ? ' and convert' : ''} record files`);
+            logMessage(`1. Download${this.convertRecordFile ? ' and convert' : ''} recorded files`);
         }
     }
 
@@ -324,7 +324,7 @@ export default class Base {
         return new Promise(resolve => {
             let ffmpegCmd = ffmpeg();
 
-            logMessage('2. Merge record files');
+            logMessage('2. Merge downloaded files');
 
             ffmpegCmd
                 .on('progress', (progress) => {
