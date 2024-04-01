@@ -162,18 +162,20 @@ export default class Base {
      * @returns Response data provided by the endpoint.
      */
     async httpContentRequest(url, method, data) {
-        let response = await axios({
-            url,
-            method: method || 'GET',
-            headers: this.headers,
-            data,
-            timeout: Ipcamsd.defaultHttpRequestTimeout
-        }).catch(({ message }) => {
-            logError(message);
-        });
+        try {
+            const response = await axios({
+                url,
+                method: method || 'GET',
+                headers: this.headers,
+                data,
+                timeout: Ipcamsd.defaultHttpRequestTimeout
+            });
 
-        if (response?.status == 200) {
-            return response.data;
+            if (response?.status == 200) {
+                return response.data;
+            }
+        } catch (e) {
+            logError(e.message);
         }
     }
 
@@ -187,42 +189,48 @@ export default class Base {
         const writeStream  = fs.createWriteStream(filename);
         const name = path.basename(filename);
 
-        const { data, headers } = await axios({
-            method: 'GET',
-            url: fileUrl,
-            headers: this.headers,
-            responseType: 'stream'
-        });
-
-        let receivedBytes = 0;
-        const totalBytes = headers['content-length'];
-
-        data.on('data', chunk => {
-            receivedBytes += chunk.length;
-
-            writeProgress(
-                name,
-                `${parseInt(receivedBytes * 100 / totalBytes)}%`
-            );
-        });
-
-        return new Promise((resolve, reject) => {
-            let error = null;
-
-            data.pipe(writeStream);
-
-            writeStream.on('error', err => {
-                error = err;
-                writeStream .close();
-                reject(err);
+        try {
+            const { data, headers } = await axios({
+                method: 'GET',
+                url: fileUrl,
+                headers: this.headers,
+                responseType: 'stream'
             });
 
-            writeStream .on('close', () => {
-                if (!error) {
-                    this.#endProgress(resolve);
-                }
+            let receivedBytes = 0;
+            const totalBytes = headers['content-length'];
+
+            data.on('data', chunk => {
+                receivedBytes += chunk.length;
+
+                writeProgress(
+                    name,
+                    `${parseInt(receivedBytes * 100 / totalBytes)}%`
+                );
             });
-        });
+
+            return new Promise((resolve, reject) => {
+                let error = null;
+
+                data.pipe(writeStream);
+
+                writeStream.on('error', err => {
+                    error = err;
+                    writeStream.close();
+                    reject(err);
+                });
+
+                writeStream .on('close', () => {
+                    if (!error) {
+                        this.#endProgress(resolve);
+                    }
+                });
+            });
+        } catch (e) {
+            writeStream.close();
+
+            logError(`${e.message} for ${name}`);
+        }
     }
 
     /**
