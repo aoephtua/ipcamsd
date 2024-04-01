@@ -67,7 +67,7 @@ export default class Base {
     async list() {
         const dates = await this.getRecords?.({});
 
-        if (dates) {
+        if (dates?.length) {
             for (const date of dates) {
                 const records = date.records;
     
@@ -233,6 +233,11 @@ export default class Base {
      */
     extractFilename = (value) => path.basename(value);
 
+    /*
+     * Prints inavailable support message to stdout.
+     */
+    logNotSupported = () => logMessage('Feature not supported');
+
     /**
      * Prints download message to stdout.
      * 
@@ -245,7 +250,7 @@ export default class Base {
     }
 
     /**
-     * Prints records message to stdout.
+     * Prints none records message to stdout.
      */
     #logNoRecordsFound = () => logMessage('No records found');
 

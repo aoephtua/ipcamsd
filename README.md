@@ -32,6 +32,8 @@ Options:
 
 ### Commands
 
+Use **[ipcamsd-cmd-generator](https://github.com/aoephtua/ipcamsd-cmd-generator)** to generate commands for ipcamsd.
+
 - [fetch](#fetch)
 - [list](#list)
 
@@ -66,7 +68,7 @@ Outputs dates and (first, last) records of specified hosts.
 
     $ ipcamsd list --host [IP...] --username [...] --password [...]
 
-Use **[ipcamsd-cmd-generator](https://github.com/aoephtua/ipcamsd-cmd-generator)** to generate commands for ipcamsd.
+**Note**: The listing of Reolink recordings is currently not supported due to the API restrictions.
 
 ## Compatibility
 

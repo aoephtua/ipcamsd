@@ -6,7 +6,12 @@ import Base from './base.mjs';
 import Ipcamsd from '../ipcamsd.mjs';
 
 export default class Reolink extends Base {
-    
+
+    /**
+     * Lists records of IP camera.
+     */
+    list = async () => this.logNotSupported();
+
     /**
      * Gets records of @see Reolink IP camera.
      * 
@@ -68,14 +73,20 @@ export default class Reolink extends Base {
      * @returns String with date part value.
      */
     extractDatePartValue(date, part, start) {
-        const value = date?.split(/_(.*)/s)[1];
+        const parts = date?.split('_');
 
-        if (value) {
+        if (parts.length > 1) {
             switch (part || 'date') {
                 case 'date':
-                    return value.slice(2, 8);
+                    return parts[1].slice(-6);
                 case 'time':
-                    return start ? value.slice(9, 15) : value.slice(16, 22);
+                    if (start) {
+                        return parts[2];
+                    } else {
+                        const end = parts[3];
+
+                        return /^0{6}$/.test(end) ? moment().format('HHmmss') : end;
+                    }
             }
         }
     }
