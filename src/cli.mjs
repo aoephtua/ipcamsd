@@ -4,15 +4,29 @@
 // Licensed under the MIT license. See LICENSE in the project root for license information.
 
 import { readFileSync } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import axios from 'axios';
 import { Command } from 'commander';
 import Ipcamsd from './ipcamsd.mjs';
 import { logMessage } from './log.mjs';
 
 /**
+ * Contains absolute path of the code file.
+ */
+const __filename = fileURLToPath(import.meta.url);
+
+/**
+ * Contains absolute path of the directory.
+ */
+const __dirname = path.dirname(__filename);
+
+/**
  * Contains metadata values of destructed package.json.
  */
-const { name, version } = JSON.parse(readFileSync('../package.json', 'utf8'));
+const { name, version } = JSON.parse(
+    readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')
+);
 
 /**
  * Contains @see Command instance of Commander.js.
