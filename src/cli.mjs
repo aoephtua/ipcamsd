@@ -3,13 +3,41 @@
 // Copyright (c) 2022, Thorsten A. Weintz. All rights reserved.
 // Licensed under the MIT license. See LICENSE in the project root for license information.
 
+import { readFileSync } from 'fs';
+import axios from 'axios';
 import { Command } from 'commander';
 import Ipcamsd from './ipcamsd.mjs';
+import { logMessage } from './log.mjs';
+
+/**
+ * Contains metadata values of destructed package.json.
+ */
+const { name, version } = JSON.parse(readFileSync('../package.json', 'utf8'));
 
 /**
  * Contains @see Command instance of Commander.js.
  */
 const program = new Command();
+
+/**
+ * Validates whether NPM package is outdated.
+ */
+const validateNpmVersion = async () => {
+    try {
+        const { status, data } =
+            await axios.get(`https://registry.npmjs.org/${name}/latest`);
+
+        if (status === 200) {
+            const npmVersion = data.version;
+
+            if (npmVersion && npmVersion > version) {
+                const cmd = `npm i -g ipcamsd@${npmVersion}`
+
+                logMessage(`Use '${cmd}' to install latest version`);
+            }
+        }
+    } catch { }
+};
 
 /**
  * Concatenates value and previous array.
@@ -67,7 +95,7 @@ function addCommand(name, isDefault, cbAddOptions) {
  * Sets the program version to @see Command instance.
  */
 program
-    .version('1.4.0', '-v, --version');
+    .version(version, '-v, --version');
 
 /**
  * Adds command and related options to fetch records to @see Command instance.
@@ -101,6 +129,11 @@ program
     .option('--username <username...>', 'username of ip camera', [])
     .option('--password <password...>', 'password of ip camera', [])
     .option('--ssl <ssl...>', 'use secure socket layer', collectBoolean, []);
+
+/**
+ * Validates whether NPM package is outdated.
+ */
+await validateNpmVersion();
 
 /**
  * Instance of @see Command parses command-line arguments.
