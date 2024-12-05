@@ -357,7 +357,7 @@ export default class Base {
         
             ffmpegCmd
                 .input(recordsFile)
-                .inputOptions(['-f concat', '-safe 0']);
+                .inputOptions(this.#getInputOptions());
             
             this.#addVideoFilter(ffmpegCmd);
             
@@ -369,7 +369,15 @@ export default class Base {
     }
 
     /**
-     * Adds video filter to ffmpeg command.
+     * Gets Array with input options for FFmpeg command.
+     * 
+     * @returns Array with input options. 
+     */
+    #getInputOptions = () =>
+        [...this.defaultInputOptions || [], '-f concat', '-safe 0'];
+
+    /**
+     * Adds video filter to FFmpeg command.
      * 
      * @param {object} ffmpegCmd The command instance of FFmpeg.
      */
@@ -446,7 +454,7 @@ export default class Base {
     }
 
     /**
-     * Gets file type by ffmpeg parameters or default value.
+     * Gets file type by FFmpeg parameters or default value.
      * 
      * @returns String with target file type.
      */
