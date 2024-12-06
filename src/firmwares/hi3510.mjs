@@ -9,7 +9,7 @@ import Base from './base.mjs';
 export default class Hi3510 extends Base {
 
     /**
-     * Array wth default input options of @see Hi3510 IP camera.
+     * Array with default input options of @see Hi3510 IP camera.
      */
     defaultInputOptions = ['-r 25'];
 
