@@ -444,7 +444,7 @@ export default class Base {
     #getFilenameByIdx() {
         const { name } = this.settings.fs;
 
-        if (name.length) {
+        if (name?.length) {
             return name[this.idx];
         }
     }
