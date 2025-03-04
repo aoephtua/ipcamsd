@@ -1,6 +1,6 @@
 {
   "name": "ipcamsd",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Command line tool and library for downloading, merging and converting record files of IP cameras",
   "main": "./src/ipcamsd.mjs",
   "type": "module",
