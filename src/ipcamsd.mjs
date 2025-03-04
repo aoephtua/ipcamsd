@@ -6,7 +6,7 @@ import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import moment from 'moment';
-import log, { logMessage } from './log.mjs';
+import log, { initStdout, logMessage } from './log.mjs';
 
 export default class Ipcamsd {
     
@@ -29,6 +29,11 @@ export default class Ipcamsd {
      * Default HTTP request timeout in milliseconds.
      */
     static defaultHttpRequestTimeout = 5000;
+
+    /**
+     * Initializes standard output (stdout).
+     */
+    static initStdOutput = () => initStdout();
 
     /**
      * Processes command by firmwares and parameters.
