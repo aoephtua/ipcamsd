@@ -59,6 +59,7 @@ Options:
   --target-directory <dir>                 target directory for converted files
   --target-file-type <type>                target file type used by ffmpeg for conversion
   --filename-prefix <prefix>               output filename prefix
+  --filename <filename...>                 output filename (ignored on separations) (default: [])
   --video-filter <filter>                  video filter in ffmpeg required format (default: [])
 ```
 
