@@ -9,7 +9,12 @@ import { fileURLToPath } from 'url';
 import axios from 'axios';
 import { Command } from 'commander';
 import Ipcamsd from './ipcamsd.mjs';
-import { logMessage } from './log.mjs';
+import { initStdout, logMessage } from './log.mjs';
+
+/**
+ * Initializes standard output (stdout).
+ */
+initStdout();
 
 /**
  * Contains absolute path of the code file.
