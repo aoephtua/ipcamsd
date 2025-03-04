@@ -131,6 +131,7 @@ addCommand('fetch', true, (command) => {
         .option('--target-directory <dir>', 'target directory for converted files')
         .option('--target-file-type <type>', 'target file type used by ffmpeg for conversion')
         .option('--filename-prefix <prefix>', 'output filename prefix')
+        .option('--filename <filename...>', 'output filename (ignored on separations)', [])
         .option('--video-filter <filter>', 'video filter in ffmpeg required format', collect, []);
 });
 

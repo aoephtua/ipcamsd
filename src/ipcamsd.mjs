@@ -43,7 +43,7 @@ export default class Ipcamsd {
         
         const settings = this.#getSettings(command, options);
 
-        await this.#iterateHosts(command, name, auth, settings);
+        return this.#iterateHosts(command, name, auth, settings);
     }
 
     /**
@@ -57,6 +57,8 @@ export default class Ipcamsd {
     async #iterateHosts(command, name, auth, settings) {
         const { hosts } = auth;
 
+        const result = [];
+
         for (let i = 0; i < hosts.length; i++) {
             const host = hosts[i];
 
@@ -66,15 +68,18 @@ export default class Ipcamsd {
             const firmware = await this.#getFirmwareInstanceByName(
                 this.#getValueByIdx(name, i),
                 host,
-                this.#getObjectByIdx(auth, ['username', 'password', 'ssl'], i)
+                this.#getObjectByIdx(auth, ['username', 'password', 'ssl'], i),
+                i
             );
 
             if (firmware) {
-                await firmware[command]?.(settings);
+                result.push(await firmware[command]?.(settings));
             } else {
                 logMessage(`Firmware ${name} not found`);
             }
         }
+
+        return result;
     }
 
     /**
@@ -89,7 +94,8 @@ export default class Ipcamsd {
             let settings = {
                 fs: {
                     directory: options.targetDirectory,
-                    prefix: options.filenamePrefix
+                    prefix: options.filenamePrefix,
+                    name: options.filename
                 },
                 ffmpeg: {
                     videoFilter: options.videoFilter,
@@ -201,9 +207,10 @@ export default class Ipcamsd {
      * @param {string} name The input name of the firmware.
      * @param {string} host The target host of IP camera.
      * @param {object} auth Object with values to authenticate.
+     * @param {number} idx Current index of host iteration.
      * @returns Firmware instance.
      */
-    async #getFirmwareInstanceByName(name, host, auth) {
+    async #getFirmwareInstanceByName(name, host, auth, idx) {
         name = name?.toLowerCase();
 
         if (name) {
@@ -218,7 +225,7 @@ export default class Ipcamsd {
                 if (Firmware) {
                     log(`Firmware: ${name}`, chalk.green);
 
-                    return new Firmware.default(host, auth);
+                    return new Firmware.default(host, auth, idx);
                 }
             }
         }

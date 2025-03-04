@@ -18,14 +18,16 @@ export default class Base {
      * 
      * @param {string} host The host to which the requests are sent.
      * @param {object} auth Object with values for authentication.
+     * @param {number} idx Current index of host iteration.
      */
-    constructor(host, auth) {
+    constructor(host, auth, idx) {
         if (new.target === Base) {
             throw new TypeError('Cannot construct abstract instances directly');
         }
 
         this.host = host;
         this.auth = auth;
+        this.idx = idx;
 
         this.setBaseUrl?.();
         this.setHeaders?.();
@@ -42,16 +44,16 @@ export default class Base {
         if (await commandExists('ffmpeg')) {
             const startDelay = this.#calculateStartDelayInMs();
 
-            await new Promise(resolve => {
+            return await new Promise(resolve => {
                 setTimeout(() => {
                     const tmpDir = tmp.dirSync({ prefix: 'ipcamsd' });
                     const dateTime = settings.dateTime;
 
                     this.getRecords?.(dateTime).then(dates => {
-                        this.downloadRecords(dates, tmpDir).then(() => {
+                        this.downloadRecords(dates, tmpDir).then((result) => {
                             fs.removeSync(tmpDir.name);
 
-                            resolve();
+                            resolve(result);
                         });
                     });
                 }, startDelay);
@@ -68,6 +70,8 @@ export default class Base {
         const dates = await this.getRecords?.({});
 
         if (dates?.length) {
+            const result = [];
+
             for (const date of dates) {
                 const records = date.records;
     
@@ -76,10 +80,16 @@ export default class Base {
                 if (records && records.length > 0) {
                     const first = records[0];
                     const last = records.length > 1 ? ' - ' + records.slice(-1)[0] : '';
+
+                    const entry = first + last;
+
+                    result.push(entry);
     
-                    log(first + last, chalk.white);
+                    log(entry, chalk.white);
                 }
             }
+
+            return result;
         } else {
             this.#logNoRecordsFound();
         }
@@ -109,6 +119,8 @@ export default class Base {
      * @param {string} tmpDir The temporary directory of this instance.
      */
     async downloadRecords(dates, tmpDir) {
+        const result = [];
+
         const separateByDate = this.settings.dateTime.separateByDate;
 
         this.#logDownloadMessage(dates.length > 0 && !separateByDate);
@@ -127,14 +139,20 @@ export default class Base {
                 await this.downloadRecordFiles(dateObj, dateTmpDir);
     
                 if (separateByDate) {
-                    await this.#createSeparateRecordsFile(dateObj, dateTmpDir);
+                    result.push(await this.#createSeparateRecordsFile(dateObj, dateTmpDir));
                 }
             } else {
                 this.#logNoRecordsFound();
             }
         }
     
-        await this.#createSingleRecordsFile(separateByDate, dates, tmpDir.name);
+        const fileName = await this.#createSingleRecordsFile(separateByDate, dates, tmpDir.name);
+
+        if (fileName) {
+            result.push(fileName);
+        }
+
+        return result;
     }
 
     /**
@@ -267,13 +285,16 @@ export default class Base {
      * 
      * @param {object} dateObj Object with date and records.
      * @param {string} dateTmpDir The temporary directory for records by date.
+     * @returns String with name of file.
      */
     async #createSeparateRecordsFile(dateObj, dateTmpDir) {
         let recordsFile = this.#createFileList(dateObj.date, dateObj.records, dateTmpDir);
 
-        const fileName = this.#getFilename(dateObj.records);
+        const fileName = this.#getFilename(dateObj.records, true);
 
         await this.#concatenateAndConvertToTargetFile(recordsFile, fileName);
+
+        return fileName;
     }
 
     /**
@@ -299,6 +320,8 @@ export default class Base {
                 const fileName = this.#getFilename(records);
         
                 await this.#concatenateAndConvertToTargetFile(recordsFile, fileName);
+
+                return fileName;
             }
         }
     }
@@ -414,30 +437,51 @@ export default class Base {
     }
 
     /**
+     * Gets target filename by index.
+     * 
+     * @returns String with raw filename.
+     */
+    #getFilenameByIdx() {
+        const { name } = this.settings.fs;
+
+        if (name.length) {
+            return name[this.idx];
+        }
+    }
+
+    /**
      * Gets target filename by parameters of records.
      * 
      * @param {Array} records Array with names of records.
+     * @param {boolean} separateByDate Contains whether to separate target file by date.
      * @returns String with target filename.
      */
-    #getFilename(records) {
+    #getFilename(records, separateByDate) {
         if (records.length > 0) {
-            let range, prefix = this.#getFilenamePrefix();
+            let range, prefix;
+            let name = this.#getFilenameByIdx();
 
-            let first = this.getDateAndTimeParts(records[0]);
-            range = `${first.date}_${first.start}`;
-
-            let last = records.length > 1
-                ? this.getDateAndTimeParts(records[records.length-1]) : null;
-            if (last) {
-                if (last.date !== first.date) {
-                    range += `_${last.date}`;
-                }
-                range += `_${last.end}`;
+            if (name && !separateByDate) {
+                prefix = name;
             } else {
-                range += `_${first.end}`;
+                prefix = this.#getFilenamePrefix();
+
+                let first = this.getDateAndTimeParts(records[0]);
+                range = `${first.date}_${first.start}`;
+
+                let last = records.length > 1
+                    ? this.getDateAndTimeParts(records[records.length-1]) : null;
+                if (last) {
+                    if (last.date !== first.date) {
+                        range += `_${last.date}`;
+                    }
+                    range += `_${last.end}`;
+                } else {
+                    range += `_${first.end}`;
+                }
             }
 
-            return `${prefix}${range}.${this.#getFileTypeByFfmpegParams()}`;
+            return `${prefix}${range || ''}.${this.#getFileTypeByFfmpegParams()}`;
         }
     }
 
