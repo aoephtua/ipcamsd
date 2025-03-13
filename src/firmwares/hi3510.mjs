@@ -1,6 +1,7 @@
 // Copyright (c) 2022, Thorsten A. Weintz. All rights reserved.
 // Licensed under the MIT license. See LICENSE in the project root for license information.
 
+import path from 'path';
 import * as Cheerio from 'cheerio';
 import chipcaco from 'chipcaco';
 import fs from 'fs-extra';
@@ -14,6 +15,11 @@ export default class Hi3510 extends Base {
     defaultInputOptions = ['-r 25'];
 
     /**
+     * Map object with collection of file names and their parent paths.
+     */
+    parents = new Map();
+
+    /**
      * Gets records of @see Hi3510 IP camera.
      * 
      * @param {object} dateTime Object with date and times values.
@@ -24,24 +30,24 @@ export default class Hi3510 extends Base {
 
         let startDate = dateTime.date?.start;
         let endDate = dateTime.date?.end;
-    
+
         let entries = await this.#getDateEntries(startDate, endDate);
 
         for (let i = 0; i < entries.length; i++) {
             let value = entries[i];
-    
+
             let records = await this.#get264Entries(value, dateTime);
-    
+
             dates.push({
                 date: value,
                 records: records
             });
-    
+
             if (entries.length == dates.length) {
                 break;
             }
         }
-    
+
         return dates;
     }
 
@@ -52,16 +58,18 @@ export default class Hi3510 extends Base {
      * @param {string} tmpDir The temporary directory of this instance.
      */
     async downloadRecordFiles(dateObj, dateTmpDir) {
-        let dateDirectoryUrl = this.#getRecordsDirectoryUrlByDate(dateObj.date);
-
         for (let i = 0; i < dateObj.records.length; i++) {
             let record = dateObj.records[i];
 
-            let fileUrl = dateDirectoryUrl + '/' + record;
-            let localFile = dateTmpDir + '\\' + record;
+            let parentUrl = this.parents.get(record);
 
-            await this.httpContentToFileStream(fileUrl, localFile);
-            await this.convertRecordFile(localFile);
+            if (parentUrl) {
+                let fileUrl = parentUrl + record;
+                let localFile = path.join(dateTmpDir, record);
+
+                await this.httpContentToFileStream(fileUrl, localFile);
+                await this.convertRecordFile(localFile);
+            }
         }
     }
 
@@ -115,7 +123,7 @@ export default class Hi3510 extends Base {
     }
     
     /**
-     * Request date entries by start and end date.
+     * Requests date entries by start and end date.
      * 
      * @param {string} startDate The start date value.
      * @param {string} endDate The end date value.
@@ -123,19 +131,38 @@ export default class Hi3510 extends Base {
      */
     async #getDateEntries(startDate, endDate) {
         let entries = [];
-        let content = await this.httpContentRequest(this.baseUrl);
+        let items = await this.#getTableRowItems(this.baseUrl);
 
-        if (content) {
-            let dates = this.#getTableRowItems(content).map(value => value.slice(0, -1));
+        for (let item of items) {
+            let date = item.slice(0, -1);
 
-            for (let date of dates) {
-                if ((!startDate || date >= startDate) && (!endDate || date <= endDate)) {
-                    entries.push(date);
-                }
+            if ((!startDate || date >= startDate) && (!endDate || date <= endDate)) {
+                entries.push(date);
             }
         }
 
         return entries;
+    }
+
+    /**
+     * Requests parent entries by date.
+     * 
+     * @param {string} date The date value.
+     * @returns Array of parents.
+     */
+    async #getParentUrls(date) {
+        let urls = [];
+
+        let url = this.#getDirectoryUrlByDate(date);
+        let items = await this.#getTableRowItems(url);
+
+        items.forEach(entry => {
+            if (entry !== 'recdata.db') {
+                urls.push(url + `/${entry}`);
+            }
+        });
+
+        return urls;
     }
 
     /**
@@ -148,14 +175,16 @@ export default class Hi3510 extends Base {
     async #get264Entries(date, dateTimeFilter) {
         let entries = [];
 
-        let url = this.#getRecordsDirectoryUrlByDate(date);
-        let content = await this.httpContentRequest(url);
+        let parentUrls = await this.#getParentUrls(date);
 
-        if (content) {
-            this.#getTableRowItems(content).forEach(entry => {
+        for (const parentUrl of parentUrls) {
+            let items = await this.#getTableRowItems(parentUrl);
+
+            items.forEach(entry => {
                 if (entry.indexOf('999999') === -1 
                     && this.#isValidRecord(date, entry, dateTimeFilter)) {
                     entries.push(entry);
+                    this.parents.set(entry, parentUrl);
                 }
             });
         }
@@ -166,20 +195,24 @@ export default class Hi3510 extends Base {
     /**
      * Adds anchor text of table entries to string array.
      * 
-     * @param {string} body The body content returned by HTTP request.
+     * @param {string} url The target URL for content request.
      * @returns Array of anchor text entries.
      */
-    #getTableRowItems(body) {
+    async #getTableRowItems(url) {
         const items = [];
 
-        let $ = Cheerio.load(body);
-        $('table > tbody > tr').toArray().slice(3).forEach(row => {
-            let anchor = $(row).find('a');
+        let body = await this.httpContentRequest(url);
 
-            if (anchor) {
-                items.push(anchor.text());
-            }
-        });
+        if (body) {
+            let $ = Cheerio.load(body);
+            $('table > tbody > tr').toArray().slice(3).forEach(row => {
+                let anchor = $(row).find('a');
+
+                if (anchor) {
+                    items.push(anchor.text());
+                }
+            });
+        }
 
         return items;
     }
@@ -222,10 +255,10 @@ export default class Hi3510 extends Base {
     }
 
     /**
-     * Gets @see string with full path of records by @see string with date directory.
+     * Gets @see string with full path by @see string with date directory.
      * 
      * @param {string} date The date value.
      * @returns String with directory URL.
      */
-    #getRecordsDirectoryUrlByDate = (date) => this.baseUrl + `/${date}/record000`;
+    #getDirectoryUrlByDate = (date) => this.baseUrl + `/${date}`;
 }
