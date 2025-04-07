@@ -1,6 +1,7 @@
 // Copyright (c) 2022, Thorsten A. Weintz. All rights reserved.
 // Licensed under the MIT license. See LICENSE in the project root for license information.
 
+import path from 'path';
 import moment from 'moment';
 import Base from './base.mjs';
 import Ipcamsd from '../ipcamsd.mjs';
@@ -58,7 +59,7 @@ export default class Reolink extends Base {
                 'Playback',
                 `&source=Mp4Record/${date}/${record}&output=${record}`
             );
-            let localFile = dateTmpDir + '\\' + record;
+            let localFile = path.join(dateTmpDir, record);
 
             await this.httpContentToFileStream(fileUrl, localFile);
         }
