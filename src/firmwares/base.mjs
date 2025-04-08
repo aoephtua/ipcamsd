@@ -12,7 +12,7 @@ import Ipcamsd from '../ipcamsd.mjs';
 import log, { logMessage, logError, writeProgress, endProgress } from '../log.mjs';
 
 export default class Base {
-    
+
     /**
      * Initializes new instance of @see Base.
      * 
@@ -41,10 +41,10 @@ export default class Base {
     async fetch(settings) {
         this.settings = settings;
 
-        if (await commandExists('ffmpeg')) {
+        if (commandExists.sync('ffmpeg')) {
             const startDelay = this.#calculateStartDelayInMs();
 
-            return await new Promise(resolve => {
+            return new Promise(resolve => {
                 setTimeout(() => {
                     const tmpDir = tmp.dirSync({ prefix: 'ipcamsd' });
                     const dateTime = settings.dateTime;
@@ -74,9 +74,9 @@ export default class Base {
 
             for (const date of dates) {
                 const records = date.records;
-    
+
                 log(date.date, chalk.magenta);
-    
+
                 if (records && records.length > 0) {
                     const first = records[0];
                     const last = records.length > 1 ? ' - ' + records.slice(-1)[0] : '';
@@ -84,7 +84,7 @@ export default class Base {
                     const entry = first + last;
 
                     result.push(entry);
-    
+
                     log(entry, chalk.white);
                 }
             }
@@ -127,17 +127,17 @@ export default class Base {
 
         for (let i = 0; i < dates.length; i++) {
             let dateObj = dates[i];
-    
+
             if (dateObj.records.length > 0) {
                 let date = dateObj.date;
                 log(date, chalk.magenta);
-    
+
                 let dateTmpDir = this.#createTmpDirForDate(tmpDir, date);
 
                 this.#logDownloadMessage(separateByDate);
-    
+
                 await this.downloadRecordFiles(dateObj, dateTmpDir);
-    
+
                 if (separateByDate) {
                     result.push(await this.#createSeparateRecordsFile(dateObj, dateTmpDir));
                 }
@@ -145,7 +145,7 @@ export default class Base {
                 this.#logNoRecordsFound();
             }
         }
-    
+
         const fileName = await this.#createSingleRecordsFile(separateByDate, dates, tmpDir.name);
 
         if (fileName) {
@@ -318,7 +318,7 @@ export default class Base {
                 let recordsFile = this.#createFileList('0000', records, tmpDir);
 
                 const fileName = this.#getFilename(records);
-        
+
                 await this.#concatenateAndConvertToTargetFile(recordsFile, fileName);
 
                 return fileName;
@@ -377,13 +377,13 @@ export default class Base {
 
                     resolve();
                 });
-        
+
             ffmpegCmd
                 .input(recordsFile)
                 .inputOptions(this.#getInputOptions());
-            
+
             this.#addVideoFilter(ffmpegCmd);
-            
+
             const directory = this.settings.fs.directory || process.cwd();
             const outputFile = path.join(directory, fileName);
 

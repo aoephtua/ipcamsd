@@ -106,7 +106,7 @@ function addCommand(name, isDefault, cbAddOptions) {
         };
 
         ipcamsd.process(name, opts.firmware, auth, options)
-            .then(null, (err) => console.error(err));
+            .then(null, (err) => console.error(err || 'An error occurred'));
     });
 }
 
