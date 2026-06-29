@@ -77,6 +77,10 @@ Outputs dates and (first, last) records of specified hosts.
 - Reolink 5MP PoE RLC-510A/B
 - Reolink Video Doorbell PoE/WiFi
 
+**Note:** The Reolink API is continuously evolving across firmware versions. Starting with newer firmware releases, authentication tokens are required for API endpoints related to playback and download operations. Older firmware versions may still allow limited access without token-based authentication, but this behavior is no longer guaranteed.
+
+Performance may also vary across firmware versions. In newer releases, users may experience reduced download and streaming speeds compared to earlier firmware builds.
+
 ## Requirements
 
 - [FFmpeg](https://ffmpeg.org/)

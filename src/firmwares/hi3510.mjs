@@ -109,7 +109,7 @@ export default class Hi3510 extends Base {
      * Sets global @see string with base URL of @see Hi3510 class.
      */
     setBaseUrl() {
-        this.baseUrl = 'http' + (this.auth.ssl ? 's' : '') + `://${this.host}/sd`;
+        this.baseUrl = `${this.getProtocol()}://${this.host}/sd`;
     }
 
     /**

@@ -78,7 +78,13 @@ export default class Ipcamsd {
             );
 
             if (firmware) {
-                result.push(await firmware[command]?.(settings));
+                if (!firmware.login || await firmware.login()) {
+                    result.push(await firmware[command]?.(settings));
+
+                    await firmware.logout?.();
+                } else {
+                    logMessage('Authentication failed');
+                }
             } else {
                 logMessage(`Firmware ${name} not found`);
             }

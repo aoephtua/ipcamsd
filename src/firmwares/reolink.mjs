@@ -9,15 +9,83 @@ import Ipcamsd from '../ipcamsd.mjs';
 export default class Reolink extends Base {
 
     /**
-     * Lists records of IP camera.
+     * Map object with collection of file names and their properties.
+     */
+    files = new Map();
+
+    /**
+     * Authenticates against the Reolink camera API and stores the session token.
+     * If authentication fails due to an invalid or expired session state,
+     * the method can retry the login process up to a limited number of attempts.
+     * 
+     * @param {number} retry Current retry attempt counter (used internally for recursive retry logic).
+     * @returns {Promise<boolean>} True if login was successful, otherwise false.
+     */
+    async login(retry = 0) {
+        const { username, password } = this.auth;
+
+        const cmdUrl = this.#getCommandUrl('Login');
+
+        const result = await this.httpContentRequest(cmdUrl, 'POST', [{
+            'cmd': 'Login',
+            'action': 0,
+            'param': {
+                'User': {
+                    'Version': 0,
+                    'userName': username,
+                    'password': password
+                }
+            }
+        }]);
+
+        if (!result?.length || result[0].error) {
+            return false;
+        }
+
+        const token = result[0].value.Token;
+
+        if (token) {
+            this.auth.token = token.name;
+
+            if (await this.#isAuthorized()) {
+                return true;
+            }
+
+            return this.#retryLogin(retry);
+        }
+
+        return false;
+    }
+
+    /**
+     * Logs out from the Reolink camera API and removes the stored session token.
+     * 
+     * @returns {Promise<object>} API response object.
+     */
+    async logout() {
+        const cmdUrl = this.#getCommandUrl('Logout');
+
+        const result = await this.httpContentRequest(cmdUrl, 'POST', [{
+            'cmd': 'Logout', 'param': {}
+        }]);
+
+        delete this.auth.token;
+
+        return result;
+    }
+
+    /**
+     * Lists records of IP camera (not supported for this implementation).
+     * 
+     * @returns {Promise<*>} Always returns logNotSupported().
      */
     list = async () => this.logNotSupported();
 
     /**
-     * Gets records of @see Reolink IP camera.
+     * Gets records of Reolink IP camera for a given date/time range.
      * 
-     * @param {object} dateTime Object with date and times values.
-     * @returns Array of records.
+     * @param {object} dateTime Object containing date and time range.
+     * @returns {Promise<Array>} Array of grouped recording metadata.
      */
     async getRecords(dateTime) {
         let dates = [];
@@ -29,10 +97,10 @@ export default class Reolink extends Base {
 
             const values = this.#getDateRange(date.start, date.end);
             const length = values.length;
-    
+
             for (let i = 0; i < length; i++) {
                 const value = values[i];
-    
+
                 await this.#requestPlaybackList(
                     dates,
                     time,
@@ -47,31 +115,36 @@ export default class Reolink extends Base {
     }
 
     /**
-     * Downloads record files of @see Reolink IP camera.
+     * Downloads recorded video files for a specific date group.
      * 
-     * @param {object} dateObj Object with date and records.
-     * @param {string} tmpDir The temporary directory of this instance.
+     * @param {object} dateObj Object containing date and associated record filenames.
+     * @param {string} dateTmpDir Temporary directory path for downloads.
+     * @returns {Promise<void>}
      */
      async downloadRecordFiles(dateObj, dateTmpDir) {
         for (let record of dateObj.records) {
-            let date = this.#formatDate(dateObj.date);
+            const { fullName, size } = this.files.get(record);
+            const start = this.#extractTimestamp(record);
+
             let fileUrl = this.#getCommandUrl(
                 'Playback',
-                `&source=Mp4Record/${date}/${record}&output=${record}`
+                `&source=${fullName}&output=${record}&channel=0&type=0&start=${start}&seek=0`
             );
             let localFile = path.join(dateTmpDir, record);
 
-            await this.httpContentToFileStream(fileUrl, localFile);
+            await this.httpContentToFileStream(fileUrl, localFile, size);
+
+            this.files.delete(record);
         }
     }
 
     /**
-     * Extracts date or time part from @see string value.
+     * Extracts date or time part from a Reolink filename string.
      * 
-     * @param {string} date The date value to extract.
-     * @param {string} part The part to extract from date.
-     * @param {boolean} start Contains whether to extract start part.
-     * @returns String with date part value.
+     * @param {string} date Filename containing encoded date/time parts.
+     * @param {'date'|'time'} part Which part to extract.
+     * @param {boolean} start Whether to extract the start time segment.
+     * @returns {string|undefined} Extracted value.
      */
     extractDatePartValue(date, part, start) {
         const parts = date?.split('_');
@@ -93,13 +166,10 @@ export default class Reolink extends Base {
     }
 
     /**
-     * Sets global @see string with base URL of @see Reolink class.
+     * Sets the base URL for Reolink API requests.
      */
     setBaseUrl() {
-        const { username, password } = this.auth;
-        const queryParams = `user=${username}&password=${password}`;
-
-        this.baseUrl = `http${this.auth.ssl ? 's' : ''}://${this.host}/cgi-bin/api.cgi?${queryParams}`;
+        this.baseUrl = `${this.getProtocol()}://${this.host}/cgi-bin/api.cgi`;
     }
 
     /**
@@ -114,6 +184,22 @@ export default class Reolink extends Base {
         const end = value.substring(6, 8);
 
         return `${date}-${start}-${end}`;
+    }
+
+    /**
+     * Extracts the recording start timestamp from a Reolink recording filename.
+     * 
+     * Example:
+     * RecM02_DST20260617_115636_120136_5328810_3B7A46D.mp4
+     * -> 20260617115636
+     * 
+     * @param {string} filename The recording filename.
+     * @returns {string|null} Timestamp in YYYYMMDDHHmmss format or null if the filename does not match.
+     */
+    #extractTimestamp(filename) {
+        const match = filename.match(/_DST(\d{8})_(\d{6})_/);
+
+        return match ? match[1] + match[2] : null;
     }
 
     /**
@@ -146,13 +232,52 @@ export default class Reolink extends Base {
     }
 
     /**
-     * Requests plackback list of @see Reolink IP camera by parameters.
+     * Retries login after logout if initial authentication fails.
      * 
-     * @param {Array} dates Array with date values.
-     * @param {object} time Object with time values.
-     * @param {date} value The date value.
-     * @param {string} cmdUrl The command URL.
-     * @param {object} params Object with parameters to process.
+     * @param {number} retry Current retry attempt.
+     * @returns {Promise<boolean>} True if login eventually succeeds.
+     */
+    async #retryLogin(retry) {
+        await this.logout();
+
+        if (retry < 2) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            return this.login(retry + 1);
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks whether the current session token is authorized.
+     * 
+     * @returns {Promise<boolean>} True if session is valid.
+     */
+    async #isAuthorized() {
+        const cmdUrl = this.#getCommandUrl('GetAbility');
+
+        const result = await this.httpContentRequest(cmdUrl, 'POST', [{
+            'cmd': 'GetAbility',
+            'param': {
+                'User': {
+                    'userName': this.auth.username
+                }
+            }
+        }]);
+
+        return result?.[0].code === 0;
+    }
+
+    /**
+     * Requests playback list from Reolink API for a specific date.
+     * 
+     * @param {Array} dates Accumulated results array.
+     * @param {object} time Time range object.
+     * @param {moment.Moment} value Current date iteration value.
+     * @param {string} cmdUrl API endpoint URL.
+     * @param {object} params Loop parameters (index, length, etc.).
+     * @returns {Promise<void>}
      */
     async #requestPlaybackList(dates, time, value, cmdUrl, params) {
         const data = this.#getPlaybackListPostData(
@@ -162,57 +287,66 @@ export default class Reolink extends Base {
             params
         );
 
-        const result = await this.httpContentRequest(cmdUrl, 'POST', data);
+        const response = await this.httpContentRequest(cmdUrl, 'POST', data);
 
-        if (result) {
-            this.#addDate(
-                dates,
-                value.format(Ipcamsd.dateFormat),
-                result
-            );
-        }
-    }
+        if (response?.length) {
+            const result = response[0];
 
-    /**
-     * Adds @see object with date values to @see Array of dates.
-     * 
-     * @param {Array} dates Array with date values.
-     * @param {string} date The date value.
-     * @param {Array} result Array with result values of HTTP request.
-     */
-    #addDate(dates, date, result) {
-        if (result) {
-            const files = result[0]?.value?.SearchResult.File;
+            if (result.code === 0) {
+                const files = result.value?.SearchResult.File;
 
-            if (files) {
-                dates.push({
-                    date,
-                    records: files.map(file => 
-                        this.extractFilename(file.name)
-                    )
-                });
+                this.#addDate(
+                    dates,
+                    value.format(Ipcamsd.dateFormat),
+                    files
+                );
             }
         }
     }
 
     /**
-     * Gets @see string with command URL and query parameters.
+     * Adds a date entry with associated recording files to the result array.
      * 
-     * @param {string} command The command value.
-     * @param {string} queryParams The command query parameters.
-     * @returns String with command URL.
+     * @param {Array} dates Target array for grouped results.
+     * @param {string} date Formatted date string.
+     * @param {Array} files List of files returned by API.
      */
-    #getCommandUrl(command, queryParams) {
-        return `${this.baseUrl}&cmd=${command}${queryParams || ''}`;
+    #addDate(dates, date, files) {
+        if (files?.length) {
+            dates.push({
+                date,
+                records: files.map(file => {
+                    const { name: fullName, size } = file;
+                    const name = this.extractFilename(fullName);
+
+                    this.files.set(name, { fullName, size });
+
+                    return name;
+                })
+            });
+        }
     }
 
     /**
-     * Gets @see object with date and time parts.
+     * Builds a full command URL for the Reolink API.
      * 
-     * @param {date} date The date value.
-     * @param {string} time The time value.
-     * @param {object} params Object with parameters to process.
-     * @returns Object with date and time values.
+     * @param {string} command API command name.
+     * @param {string} queryParams Optional query string parameters.
+     * @returns {string} Fully constructed request URL.
+     */
+    #getCommandUrl(command, queryParams) {
+        const token = this.auth?.token ? `&token=${this.auth.token}` : '';
+
+        return `${this.baseUrl}?cmd=${command}${queryParams || ''}${token}`;
+    }
+
+    /**
+     * Converts date and time into Reolink API compatible object format.
+     * 
+     * @param {moment.Moment} date Date object.
+     * @param {string} time Time string.
+     * @param {object} params Loop parameters.
+     * @returns {object} Structured date/time object for API request.
      */
     #getDateAndTime(date, time, params) {
         let value = moment(
@@ -231,11 +365,11 @@ export default class Reolink extends Base {
     }
 
     /**
-     * Gets @see string with formatted time by parameters and conditions.
+     * Normalizes time values depending on loop position and range rules.
      * 
-     * @param {string} time The time value.
-     * @param {object} params Objects with parameters to process.
-     * @returns String with formatted time.
+     * @param {string} time Input time string.
+     * @param {object} params Loop context parameters.
+     * @returns {string} Normalized time string.
      */
     #getTime(time, params) {
         const { idx, length, end } = params;
@@ -256,13 +390,13 @@ export default class Reolink extends Base {
     }
 
     /**
-     * Gets @see Array with search @see object and date parameters.
+     * Builds POST payload for Reolink playback search request.
      * 
-     * @param {date} date The date value.
-     * @param {string} start The start part value.
-     * @param {string} end The end part value.
-     * @param {object} params Object with parameters to process.
-     * @returns Array of request data with parameters.
+     * @param {moment.Moment} date Date being queried.
+     * @param {string} start Start time.
+     * @param {string} end End time.
+     * @param {object} params Loop parameters.
+     * @returns {Array<object>} Request payload array.
      */
     #getPlaybackListPostData(date, start, end, params) {
         return [{ 

@@ -8,8 +8,14 @@ import commandExists from 'command-exists';
 import ffmpeg from 'fluent-ffmpeg';
 import path from 'path';
 import tmp from 'tmp';
+import { pipeline } from 'stream/promises';
 import Ipcamsd from '../ipcamsd.mjs';
-import log, { logMessage, logError, writeProgress, endProgress } from '../log.mjs';
+import log, {
+    logMessage,
+    logError,
+    writeProgress,
+    endProgress
+} from '../log.mjs';
 
 export default class Base {
 
@@ -93,6 +99,15 @@ export default class Base {
         } else {
             this.#logNoRecordsFound();
         }
+    }
+
+    /**
+     * Gets the HTTP protocol based on the SSL configuration.
+     *
+     * @returns {string} The protocol (`http` or `https`).
+     */
+    getProtocol() {
+        return 'http' + (this.auth.ssl ? 's' : '');
     }
 
     /**
@@ -202,52 +217,88 @@ export default class Base {
      * 
      * @param {string} fileUrl The URL of file to stream.
      * @param {string} filename The target filename of stream.
+     * @param {number} size The content length of target file.
      */
-    async httpContentToFileStream(fileUrl, filename) {
-        const writeStream  = fs.createWriteStream(filename);
+    async httpContentToFileStream(fileUrl, filename, size) {
+        const writeStream = fs.createWriteStream(filename);
         const name = path.basename(filename);
 
+        let receivedBytes = 0;
+        let lastProgress = 0;
+
         try {
-            const { data, headers } = await axios({
+            const response = await axios({
                 method: 'GET',
                 url: fileUrl,
                 headers: this.headers,
-                responseType: 'stream'
+                responseType: 'stream',
+                timeout: 0
             });
 
-            let receivedBytes = 0;
-            const totalBytes = headers['content-length'];
+            const { data, headers } = response;
 
-            data.on('data', chunk => {
+            const totalBytes = headers['content-length'] || size || 0;
+
+            data.on('data', (chunk) => {
                 receivedBytes += chunk.length;
 
-                writeProgress(
-                    name,
-                    `${parseInt(receivedBytes * 100 / totalBytes)}%`
-                );
-            });
+                if (totalBytes > 0) {
+                    const percent = Math.floor((receivedBytes / totalBytes) * 100);
 
-            return new Promise((resolve, reject) => {
-                let error = null;
+                    if (percent !== lastProgress) {
+                        lastProgress = percent;
 
-                data.pipe(writeStream);
-
-                writeStream.on('error', err => {
-                    error = err;
-                    writeStream.close();
-                    reject(err);
-                });
-
-                writeStream .on('close', () => {
-                    if (!error) {
-                        this.#endProgress(resolve);
+                        writeProgress(
+                            name,
+                            `${Math.min(percent, 99)}%`
+                        );
                     }
-                });
+                } else {
+                    writeProgress(
+                        name,
+                        `${(receivedBytes / 1024 / 1024).toFixed(1)} MB`
+                    );
+                }
             });
-        } catch (e) {
-            writeStream.close();
 
-            logError(`${e.message} for ${name}`);
+            let pipelineError = null;
+
+            try {
+                await pipeline(data, writeStream);
+            } catch (err) {
+                pipelineError = err;
+            }
+
+            let fileSize = 0;
+            try {
+                fileSize = fs.statSync(filename).size;
+            } catch (_) {}
+
+            const success =
+                !pipelineError ||
+                (pipelineError.code === 'ECONNRESET' && fileSize > 0);
+
+            if (!success) {
+                throw pipelineError;
+            }
+
+            writeProgress(name, '100%');
+
+            endProgress();
+
+            return {
+                receivedBytes,
+                fileSize,
+                expectedSize: totalBytes
+            };
+        } catch (err) {
+            try {
+                writeStream.close();
+            } catch (_) {}
+
+            logError(`${err.message} for ${name}`);
+
+            throw err;
         }
     }
 
@@ -338,16 +389,6 @@ export default class Base {
         fs.mkdirSync(dateTmpDir);
 
         return dateTmpDir;
-    }
-
-    /**
-     * Prints newline to stdout and resolves promise on progress end.
-     * 
-     * @param {function} resolve The function to resolve promise.
-     */
-    #endProgress(resolve) {
-        endProgress();
-        resolve();
     }
 
     /**
