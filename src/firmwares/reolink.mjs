@@ -6,6 +6,12 @@ import moment from 'moment';
 import Base from './base.mjs';
 import Ipcamsd from '../ipcamsd.mjs';
 
+/**
+ * Delay between consecutive recording downloads to allow
+ * the camera to release playback resources.
+ */
+const DOWNLOAD_DELAY_MS = 1000;
+
 export default class Reolink extends Base {
 
     /**
@@ -122,19 +128,41 @@ export default class Reolink extends Base {
      * @returns {Promise<void>}
      */
      async downloadRecordFiles(dateObj, dateTmpDir) {
-        for (let record of dateObj.records) {
-            const { fullName, size } = this.files.get(record);
+        for (const [index, record] of dateObj.records.entries()) {
+            const file = this.files.get(record);
+
+            if (!file) {
+                throw new Error(`Recording metadata not found: ${record}`);
+            }
+
+            const { fullName, size } = file;
             const start = this.#extractTimestamp(record);
 
-            let fileUrl = this.#getCommandUrl(
+            if (!start) {
+                throw new Error(`Invalid recording timestamp: ${record}`);
+            }
+
+            const fileUrl = this.#getCommandUrl(
                 'Playback',
-                `&source=${fullName}&output=${record}&channel=0&type=0&start=${start}&seek=0`
+                `&source=${fullName}` +
+                `&output=${record}` +
+                `&channel=0` +
+                `&type=0` +
+                `&start=${start}` +
+                `&seek=0`
             );
+
             let localFile = path.join(dateTmpDir, record);
 
             await this.httpContentToFileStream(fileUrl, localFile, size);
 
             this.files.delete(record);
+
+            if (index < dateObj.records.length - 1) {
+                await new Promise(resolve =>
+                    setTimeout(resolve, DOWNLOAD_DELAY_MS)
+                );
+            }
         }
     }
 
@@ -188,16 +216,20 @@ export default class Reolink extends Base {
 
     /**
      * Extracts the recording start timestamp from a Reolink recording filename.
+     * Supports filenames with and without the optional "_DST" prefix.
      * 
-     * Example:
+     * Examples:
      * RecM02_DST20260617_115636_120136_5328810_3B7A46D.mp4
      * -> 20260617115636
+     * 
+     * RecM0A_20261025_201831_202031_0_6D288100000000_17F012D.mp4
+     * -> 20261025201831
      * 
      * @param {string} filename The recording filename.
      * @returns {string|null} Timestamp in YYYYMMDDHHmmss format or null if the filename does not match.
      */
     #extractTimestamp(filename) {
-        const match = filename.match(/_DST(\d{8})_(\d{6})_/);
+        const match = filename.match(/(?:_DST)?(\d{8})_(\d{6})_/);
 
         return match ? match[1] + match[2] : null;
     }
